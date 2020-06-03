@@ -1,3 +1,5 @@
+source ./alap-giovanni.tcl
+
 proc get_sorted_U {V S} {
 	set U [list]
 
