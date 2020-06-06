@@ -19,8 +19,9 @@ proc alap_sched {nodes_l lambda} {
 		foreach child [get_attribute $node children] {
 			set child_l [dict get $nodes_l $child]
 			set t_alap_child [dict get $child_l t_alap]
-			if {$t_alap_child - $node_delay < $t_alap} {
-				set t_alap [expr $t_alap_child - $node_delay]
+			set t_alap_new [expr $t_alap_child - $node_delay]
+			if {$t_alap_new < $t_alap} {
+				set t_alap $t_alap_new
 			}
 		}
 		dict set node_l t_alap $t_alap
