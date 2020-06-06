@@ -43,7 +43,7 @@ proc brave_opt args {
 	}
 
 	# label nodes with last possible start time (with fastest resources)
-	set nodes_l [alap $nodes_l $latency_value]
+	set nodes_l [alap_sched $nodes_l $latency_value]
 
 	foreach node [get_sorted_nodes] {
 		
