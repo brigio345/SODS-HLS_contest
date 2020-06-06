@@ -12,8 +12,7 @@ source ./contest/src/utils.tcl
 proc alap_sched {nodes_l lambda} {
 	# iterate all nodes, in a reverse topological order
 	# (so that it is always considered a node with all descendant scheduled)
-	foreach node [dict keys [get_reverse_sorted_nodes $nodes_l]] {
-		set node_l [dict get $nodes_l $node]
+	dict for {node node_l} [get_reverse_sorted_nodes $nodes_l] {
 		set node_delay [get_attribute [dict get $node_l fu] delay]
 		set t_alap $lambda
 		foreach child [get_attribute $node children] {

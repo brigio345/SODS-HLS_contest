@@ -8,8 +8,7 @@ proc get_reverse_sorted_nodes {nodes_l} {
 	set sorted_l [dict create]
 
 	# label all nodes with "sorted" key
-	foreach node [dict keys $nodes_l] {
-		set node_l [dict get $nodes_l $node]
+	dict for {node node_l} $nodes_l {
 		dict set node_l sorted 0
 		dict set nodes_l $node $node_l
 	}
@@ -17,8 +16,7 @@ proc get_reverse_sorted_nodes {nodes_l} {
 	set fully_sorted 0
 	while {$fully_sorted == 0} {
 		set fully_sorted 1
-		foreach node [dict keys $nodes_l] {
-			set node_l [dict get $nodes_l $node]
+		dict for {node node_l} $nodes_l {
 			if {[dict get $node_l sorted] == 0} {
 				set all_child_sorted 1
 				foreach child [get_attribute $node children] {
