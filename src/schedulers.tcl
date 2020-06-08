@@ -43,15 +43,22 @@ proc alap_sched {nodes_dict lambda} {
 #			2. fu: functional unit (chosen trying to minimize area
 #				and power consumption)
 proc malc_brave {nodes_dict lambda} {
-	set ready_lst [list]
-	set waiting_lst [list]
-	set running_lst [list]
 	set fus_dict [get_sorted_fus_per_op delay]
 
+	# do not allocate any fu at the beginnning
+	set fus_alloc_dict [dict create]
+	foreach fu [get_lib_fus] {
+		dict set fus_alloc_dict $fu 0
+	}
+
 	set has_slowed 1
-	# iterate as long as improvement is achieved
-	while {$has_slowed == 1} {
+	# repeat until a node has slowed or a fu has allocated
+	while {$has_slowed == 1 || $has_allocated == 1} {
 		set has_slowed 0
+
+		set ready_lst [list]
+		set waiting_lst [list]
+		set running_lst [list]
 
 		# initialization
 		dict for {node node_dict} $nodes_dict {
@@ -71,31 +78,42 @@ proc malc_brave {nodes_dict lambda} {
 
 			dict set nodes_dict $node $node_dict
 
-			# only nodes with 0 parents are initially ready
-			# to be scheduled
-			if {[get_attribute $node n_parents] > 0} {
-				lappend waiting_lst $node
-			} else {
-				lappend ready_lst $node
-			}
+			# set all nodes as "waiting"
+			lappend waiting_lst $node
 		}
 
-		# initialize dictionaries for storing number of fus
-		# TODO: find a way to allocate some initial fus, otherwise we
-		#	end up waiting until it is too late and we need multiple
-		#	fus
-		set fus_alloc_dict [dict create]
+		# set all fus as not "running"
 		set fus_running_dict [dict create]
 		foreach fu [get_lib_fus] {
-			dict set fus_alloc_dict $fu 0
 			dict set fus_running_dict $fu 0
 		}
 
+		set has_allocated 0
 		set t 0
 		# iterate until all nodes are scheduled
-		while {[llength $waiting_lst] + [llength $ready_lst] > 0} {
+		while {[llength $waiting_lst] + [llength $ready_lst] > 0 && $has_allocated == 0} {
 			# update current time
 			incr t
+
+			# update ready list
+			foreach node $waiting_lst {
+				set ready 1
+
+				# check if all parents are scheduled (not present in ready
+				# or waiting lists)
+				foreach parent [get_attribute $node parents] {
+					if {[lsearch $waiting_lst $parent] != -1 ||
+							[lsearch $ready_lst $parent] != -1} {
+						set ready 0
+						break
+					}
+				}
+
+				if {$ready == 1} {
+					lappend ready_lst $node
+					lremove waiting_lst $node
+				}
+			}
 
 			# check what nodes has completed at time t
 			# and update fus_running_dict accordingly
@@ -190,27 +208,15 @@ proc malc_brave {nodes_dict lambda} {
 					dict set fus_running_dict $fu $running
 					if {$running > $alloc} {
 						dict set fus_alloc_dict $fu $running
-					}
-				}
-			}
 
-			# update ready list after scheduling at time t
-			foreach node $waiting_lst {
-				set ready 1
-
-				# check if all parents are scheduled (not present in ready
-				# or waiting lists)
-				foreach parent [get_attribute $node parents] {
-					if {[lsearch $waiting_lst $parent] != -1 ||
-							[lsearch $ready_lst $parent] != -1} {
-						set ready 0
+						# repeat the scheduling every time
+						# a functional unit is added
+						# N.B. this brings execution back
+						# to initialization (only fus_alloc_dict
+						# is kept)
+						set has_allocated 1
 						break
 					}
-				}
-
-				if {$ready == 1} {
-					lappend ready_lst $node
-					lremove waiting_lst $node
 				}
 			}
 		}
