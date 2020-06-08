@@ -1,5 +1,13 @@
-proc lremove {listVariable value} {
-	upvar 1 $listVariable var
+# lremove:
+#	* argument(s):
+#		- list_variable: variable name of a list.
+#		- value: value to be removed from the list.
+#	* return: 
+#		none.
+#	* behavior:
+#		remove the value from the list
+proc lremove {list_variable value} {
+	upvar 1 $list_variable var
 	set idx [lsearch -exact $var $value]
 	set var [lreplace $var $idx $idx]
 }
