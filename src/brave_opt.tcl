@@ -42,7 +42,13 @@ proc brave_opt args {
 		}
 	}
 
-	puts [malc_brave $nodes_dict $latency_value]
+	set start_time [clock clicks -milliseconds]
+
+	malc_brave $nodes_dict $latency_value
+
+	set end_time [clock clicks -milliseconds]
+
+	puts "Execution took [expr {$end_time - $start_time}] ms"
 
 	return
 }
