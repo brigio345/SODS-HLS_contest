@@ -21,36 +21,25 @@ proc lremove {list_variable value} {
 proc get_reverse_sorted_nodes {nodes_dict} {
 	set sorted_dict [dict create]
 
-	# label all nodes with "sorted" key
-	dict for {node node_dict} $nodes_dict {
-		dict set node_dict sorted 0
-		dict set nodes_dict $node $node_dict
+	set unsorted_lst [list]
+	foreach node [dict keys $nodes_dict] {
+		lappend unsorted_lst $node
 	}
 
-	set fully_sorted 0
-	while {$fully_sorted == 0} {
-		set fully_sorted 1
-		dict for {node node_dict} $nodes_dict {
-			if {[dict get $node_dict sorted] == 0} {
-				set all_child_sorted 1
-				foreach child [get_attribute $node children] {
-					# if current node has a child not sorted yet,
-					# it cannot be added to sorted list
-					if {[dict exists $sorted_dict $child] == 0} {
-						set all_child_sorted 0
-						break
-					}
+	while {[llength $unsorted_lst] > 0} {
+		foreach node $unsorted_lst {
+			set all_child_sorted 1
+			foreach child [get_attribute $node children] {
+				# if current node has a child not sorted yet,
+				# it cannot be added to sorted list
+				if {[lsearch $unsorted_lst $child] != -1} {
+					set all_child_sorted 0
+					break
 				}
-
-				if {$all_child_sorted} {
-					# remove no more needed label
-					set node_dict [dict remove $node_dict sorted]
-					dict set sorted_dict $node $node_dict
-				} else {
-					# there exists a node not sorted that
-					# cannot be sorted yet
-					set fully_sorted 0
-				}
+			}
+			if {$all_child_sorted == 1} {
+				lremove unsorted_lst $node
+				dict set sorted_dict $node [dict get $nodes_dict $node]
 			}
 		}
 	}
