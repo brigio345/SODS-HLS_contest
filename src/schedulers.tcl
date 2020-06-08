@@ -229,6 +229,6 @@ proc malc_brave {nodes_dict lambda} {
 		dict set nodes_dict $node $node_dict
 	}
 
-	return $nodes_dict
+	return [dict create nodes $nodes_dict fus $fus_alloc_dict]
 }
 

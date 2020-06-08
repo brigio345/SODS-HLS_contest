@@ -44,12 +44,28 @@ proc brave_opt args {
 
 	set start_time [clock clicks -milliseconds]
 
-	malc_brave $nodes_dict $latency_value
+	set res_dict [malc_brave $nodes_dict $latency_value]
 
 	set end_time [clock clicks -milliseconds]
 
 	puts "Execution took [expr {$end_time - $start_time}] ms"
 
-	return
+	set nodes_dict [dict get $res_dict nodes]
+
+	set start_time_lst [list]
+	set fu_id_lst [list]
+	dict for {node node_dict} $nodes_dict {
+		lappend start_time_lst "$node [dict get $node_dict t_sched]"
+		lappend fu_id_lst "$node [dict get $node_dict fu]"
+	}
+
+	set fus_dict [dict get $res_dict fus]
+
+	set fu_alloc_lst [list]
+	dict for {fu alloc} $fus_dict {
+		lappend fu_alloc_lst "$fu $alloc"
+	}
+
+	return [list $start_time_lst $fu_id_lst $fu_alloc_lst]
 }
 
