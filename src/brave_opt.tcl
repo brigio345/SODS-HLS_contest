@@ -19,35 +19,30 @@ proc brave_opt args {
 
 	puts $latency_value
 
-	# malc + check:
-	# foreach v in U
-	# 	foreach fu in fus (slowest to fastest)
-	#		s_new_map = tALAP - (t_slower - t_fastest) -- add this delta to fus directly instead of having absolute value
-	#		if (s_new_map > 0)
-	#			skip -- can be scheduled later, with slower res
-	#		elsif (0)
-	#			map to this slower res and schedule now
-	#			update children
-	#		else
-	#			cannot slow down
-	set fus_l [get_sorted_fus_per_op delay]
-	set nodes_l [dict create]
+	set fus_dict [get_sorted_fus_per_op delay]
+	set nodes_dict [dict create]
 
 	# associate nodes to fastest resources
 	foreach node [get_nodes] {
 		set op [get_attribute $node operation]
-		set fu [lindex [dict get $fus_l $op] 0]
-		set node_l [dict create fu_index 0]
-		dict set node_l fu $fu
-		dict set nodes_l $node $node_l
+		set fu_dict [lindex [dict get $fus_dict $op] 0]
+		set fu [dict get $fu_dict fu]
+		set node_dict [dict create fu_index 0]
+		dict set node_dict fu $fu
+		dict set nodes_dict $node $node_dict
 	}
 
 	# label nodes with last possible start time (with fastest resources)
-	set nodes_l [alap_sched $nodes_l $latency_value]
+	set nodes_dict [alap_sched $nodes_dict $latency_value]
 
-	foreach node [get_sorted_nodes] {
-		
+	# check if scheduling is feasible
+	foreach node_dict [dict values $nodes_dict] {
+		if {[dict get $node_dict t_alap] < 0} {
+			return -code error "No feasible scheduling with lambda=$latency_value"
+		}
 	}
+
+	puts [malc_brave $nodes_dict $latency_value]
 
 	return
 }
