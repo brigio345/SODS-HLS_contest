@@ -40,11 +40,12 @@ proc alap_sched {nodes_dict lambda} {
 #	* return: 
 #		nodes_dict with each node labeled with:
 #			1. t_sched: start time.
-#			2. fu: functional unit (chosen trying to minimizing area
+#			2. fu: functional unit (chosen trying to minimize area
 #				and power consumption)
 proc malc_brave {nodes_dict lambda} {
 	set ready_lst [list]
 	set waiting_lst [list]
+	set running_lst [list]
 	set fus_dict [get_sorted_fus_per_op delay]
 
 	set has_slowed 1
@@ -79,11 +80,38 @@ proc malc_brave {nodes_dict lambda} {
 			}
 		}
 
+		# initialize dictionaries for storing number of fus
+		# TODO: find a way to allocate some initial fus, otherwise we
+		#	end up waiting until it is too late and we need multiple
+		#	fus
+		set fus_alloc_dict [dict create]
+		set fus_running_dict [dict create]
+		foreach fu [get_lib_fus] {
+			dict set fus_alloc_dict $fu 0
+			dict set fus_running_dict $fu 0
+		}
+
 		set t 0
 		# iterate until all nodes are scheduled
 		while {[llength $waiting_lst] + [llength $ready_lst] > 0} {
 			# update current time
 			incr t
+
+			# check what nodes has completed at time t
+			# and update fus_running_dict accordingly
+			foreach node $running_lst {
+				set node_dict [dict get $nodes_dict $node]
+				set t_sched [dict get $node_dict t_sched]
+				set fu [dict get $node_dict fu]
+				set delay [get_attribute $fu delay]
+
+				if {$t_sched + $delay >= $t} {
+					lremove running_lst $node
+					set running [dict get $fus_running_dict $fu]
+					incr running -1
+					dict set fus_running_dict $fu $running
+				}
+			}
 
 			foreach node $ready_lst {
 				set node_dict [dict get $nodes_dict $node]
@@ -143,17 +171,26 @@ proc malc_brave {nodes_dict lambda} {
 					dict set nodes_dict $node $node_dict
 				}
 
-				# schedule node with no more positive slack
-				if {$slack == 0} {
+				set fu [dict get $node_dict fu]
+
+				set running [dict get $fus_running_dict $fu]
+				set alloc [dict get $fus_alloc_dict $fu]
+				# schedule node with no more positive slack or
+				# which do not require additional fu
+				if {$slack == 0 || $running < $alloc} {
 					# annotate scheduled node with t_sched
 					dict set node_dict t_sched $t
 					dict set nodes_dict $node $node_dict
 					# remove scheduled node from ready_lst
 					lremove ready_lst $node
-					# TODO: update fu count
-				} else {
-					# TODO: schedule node which do not
-					#	require additional fu
+					lappend running_lst $node
+
+					# update fus count
+					incr running
+					dict set fus_running_dict $fu $running
+					if {$running > $alloc} {
+						dict set fus_alloc_dict $fu $running
+					}
 				}
 			}
 
