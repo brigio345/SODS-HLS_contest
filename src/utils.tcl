@@ -105,30 +105,3 @@ proc get_sorted_fus_per_op {attr} {
 	return $fus_dict
 }
 
-# get_nodes_per_op:
-#	* argument(s):
-#		None.
-#	* return: 
-#		dictionary in which the key corresponds to operation
-#		and the value corresponds to list nodes associated to
-#		the key operation.
-#		N.B. only operations present in the current design are included.
-proc get_nodes_per_op {} {
-	set nodes [dict create]
-
-	foreach node [get_nodes] {
-		set op [get_attribute $node operation]
-		if {[dict exists $nodes $op]} {
-			# if the operation already exists in the dictionary,
-			# we have to add current node to the list
-			dict set nodes $op [concat [dict get $nodes $op] $node]
-		} else {
-			# if the operation do not exists in the dictionary,
-			# we have create a new list, containing current node
-			dict set nodes $op [list $node]
-		}
-	}
-
-	return $nodes
-}
-
