@@ -132,29 +132,3 @@ proc get_nodes_per_op {} {
 	return $nodes
 }
 
-# update_t_alap:
-#	* argument(s):
-#		- node: node whose t_alap has to be updated (children will be
-#			recursively updated too).
-#		- nodes_dict: dictionary in which keys correspond to nodes and
-#			values correspond to information about the key node.
-#		- delta: value to be subtracted to t_alap (can be negative).
-#	* return: 
-#		nodes_dict with t_alap values updated.
-proc update_t_alap {node nodes_dict delta} {
-	set node_dict [dict get $nodes_dict $node]
-	# get current t_alap
-	set t_alap [dict get $node_dict t_alap]
-	# update t_alap
-	set t_alap [expr {$t_alap - $delta}]
-	dict set node_dict t_alap $t_alap
-	dict set nodes_dict $node $node_dict
-
-	foreach child [get_attribute $node children] {
-		# recur on children
-		set nodes_dict [update_t_alap $child $nodes_dict $delta]
-	}
-
-	return $nodes_dict
-}
-
