@@ -225,7 +225,6 @@ proc malc_brave {nodes_dict lambda} {
 	# remove malc labels
 	dict for {node node_dict} $nodes_dict {
 		set node_dict [dict remove $node_dict slowable]
-		set node_dict [dict remove $node_dict slowed]
 		dict set nodes_dict $node $node_dict
 	}
 
