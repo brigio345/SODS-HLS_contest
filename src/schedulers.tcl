@@ -119,11 +119,12 @@ proc malc_brave {nodes_dict lambda} {
 			# and update fus_running_dict accordingly
 			foreach node $running_lst {
 				set node_dict [dict get $nodes_dict $node]
+
 				set t_sched [dict get $node_dict t_sched]
 				set fu [dict get $node_dict fu]
 				set delay [get_attribute $fu delay]
 
-				if {$t_sched + $delay >= $t} {
+				if {$t >= $t_sched + $delay} {
 					lremove running_lst $node
 					set running [dict get $fus_running_dict $fu]
 					incr running -1
