@@ -221,7 +221,56 @@ proc malc_brave {nodes_dict lambda} {
 				}
 			}
 		}
+
+		# check if all allocated fus are still associated to at least a node
+		# (it is possible that after slowing/allocating some fus are no
+		# more needed)
+		dict for {fu n_alloc} $fus_alloc_dict {
+			set start_lst [list]
+			dict for {node node_dict} $nodes_dict {
+				set node_fu [dict get $node_dict fu]
+				if {$node_fu == $fu} {
+					if {[dict exists $node_dict t_sched] == 1} {
+						lappend start_lst [dict get $node_dict t_sched]
+					}
+				}
+			}
+
+			set $start_lst [lsort -integer $start_lst]
+			set delay [get_attribute $fu delay]
+			set end_lst [list]
+			foreach start $start_lst {
+				lappend end_lst [expr {$start + $delay}]
+			}
+
+			set n_alloc_max 0
+			for {set i 0} {$i < [llength $start_lst]} {incr i} {
+				set start_i [lindex $start_lst $i]
+				set end_i [lindex $end_lst $i]
+				set n_alloc 1
+
+				for {set j [expr {$i + 1}]} {$j < [llength $start_lst]} {incr j} {
+					set start_j [lindex $start_lst $j]
+					set end_j [lindex $end_lst $j]
+
+					if {$start_j >= $start_i && $start_j < $end_i} {
+						incr n_alloc
+					}
+				}
+
+				if {$n_alloc > $n_alloc_max} {
+					set n_alloc_max $n_alloc
+				}
+			}
+
+			# remove no more needed fus (they were needed in previous iteration)
+			if {$n_alloc > $n_alloc_max} {
+				dict set fus_alloc_dict $fu $n_alloc_max
+			}
+		}
 	}
+
+	
 
 	# remove malc labels
 	dict for {node node_dict} $nodes_dict {
