@@ -68,37 +68,39 @@ proc test_dependencies {start_time_lst fu_id_lst} {
 proc test_fu_conflicts {start_time_lst fu_id_lst fu_alloc_lst} {
 	foreach fu [get_lib_fus] {
 		puts -nonewline "Checking conflicts for functional unit $fu..."
-		set delay [get_attribute $fu delay]
 		set start_lst [list]
-		set end_lst [list]
 		foreach fu_id_i [lsearch -all -index 1 $fu_id_lst $fu] {
 			set fu_id_pair [lindex $fu_id_lst $fu_id_i]
 			set node [lindex $fu_id_pair 0]
-			set start_time_i [lsearch -index 0 $start_time_lst $node]
-			set start_time_pair [lindex $start_time_lst $start_time_i]
+			set start_time_pair [lsearch -inline -index 0 $start_time_lst $node]
 			set start [lindex $start_time_pair 1]
 			lappend start_lst $start
+		}
+
+		set $start_lst [lsort -integer $start_lst]
+		set delay [get_attribute $fu delay]
+		set end_lst [list]
+		foreach start $start_lst {
 			lappend end_lst [expr {$start + $delay}]
 		}
 
-		set n_allocated_max 0
+		set n_alloc_max 0
 		for {set i 0} {$i < [llength $start_lst]} {incr i} {
 			set start_i [lindex $start_lst $i]
 			set end_i [lindex $end_lst $i]
-			set n_allocated 1
+			set n_alloc 1
 
 			for {set j [expr {$i + 1}]} {$j < [llength $start_lst]} {incr j} {
 				set start_j [lindex $start_lst $j]
 				set end_j [lindex $end_lst $j]
 
-				if {$start_j >= $start_i && $start_j < $end_i ||
-					$start_i >= $start_j && $start_i < $end_j} {
-					incr n_allocated
+				if {$start_j >= $start_i && $start_j < $end_i} {
+					incr n_alloc
 				}
 			}
 
-			if {$n_allocated > $n_allocated_max} {
-				set n_allocated_max $n_allocated
+			if {$n_alloc > $n_alloc_max} {
+				set n_alloc_max $n_alloc
 			}
 		}
 
@@ -106,7 +108,7 @@ proc test_fu_conflicts {start_time_lst fu_id_lst fu_alloc_lst} {
 		set fu_alloc_pair [lindex $fu_alloc_lst $fu_alloc_i]
 		set n_alloc [lindex $fu_alloc_pair 1]
 
-		if {$n_alloc != $n_allocated_max} {
+		if {$n_alloc != $n_alloc_max} {
 			puts "\tFAIL"
 			return 0
 		}
