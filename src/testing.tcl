@@ -16,7 +16,15 @@ proc test_suite {} {
 		puts "Testing DFG $dfg"
 		read_design $dfg
 
+		puts "Executing algorithm..."
+
+		set start_time [clock clicks -milliseconds]
+
 		set res [brave_opt -lambda $lambda]
+
+		set end_time [clock clicks -milliseconds]
+
+		puts "Execution time... \t\t\t[expr {$end_time - $start_time}] ms"
 
 		set start_time_lst [lindex $res 0]
 		set fu_id_lst [lindex $res 1]
