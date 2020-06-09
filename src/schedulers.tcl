@@ -222,20 +222,26 @@ proc malc_brave {nodes_dict lambda} {
 			}
 		}
 
-		# check if all allocated fus are still associated to at least a node
+		# check if all allocated fus are still associated to at least a
+		# scheduled node
 		# (it is possible that after slowing/allocating some fus are no
 		# more needed)
 		dict for {fu n_alloc} $fus_alloc_dict {
+			# collect start time of all nodes associated to the current fu
 			set start_lst [list]
 			dict for {node node_dict} $nodes_dict {
 				set node_fu [dict get $node_dict fu]
 				if {$node_fu == $fu} {
+					# check if current node is actually scheduled
+					# (it may just be associated to the fu by
+					# default)
 					if {[dict exists $node_dict t_sched] == 1} {
 						lappend start_lst [dict get $node_dict t_sched]
 					}
 				}
 			}
 
+			# sort list to make later checks easier
 			set $start_lst [lsort -integer $start_lst]
 			set delay [get_attribute $fu delay]
 			set end_lst [list]
@@ -243,6 +249,8 @@ proc malc_brave {nodes_dict lambda} {
 				lappend end_lst [expr {$start + $delay}]
 			}
 
+			# find the maximum number of instances of the fu
+			# running at the same time
 			set n_alloc_max 0
 			for {set i 0} {$i < [llength $start_lst]} {incr i} {
 				set start_i [lindex $start_lst $i]
@@ -253,6 +261,9 @@ proc malc_brave {nodes_dict lambda} {
 					set start_j [lindex $start_lst $j]
 					set end_j [lindex $end_lst $j]
 
+					# if interval of fu instance j intersects
+					# interval of instance i, it is needed to
+					# allocate one more resource
 					if {$start_j >= $start_i && $start_j < $end_i} {
 						incr n_alloc
 					}
