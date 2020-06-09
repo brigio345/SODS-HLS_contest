@@ -37,7 +37,7 @@ proc brave_opt args {
 
 	# check if scheduling is feasible
 	foreach node_dict [dict values $nodes_dict] {
-		if {[dict get $node_dict t_alap] < 0} {
+		if {[dict get $node_dict t_alap] <= 0} {
 			return -code error "No feasible scheduling with lambda=$latency_value"
 		}
 	}
