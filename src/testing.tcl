@@ -5,8 +5,9 @@
 #	* return: 
 #		1 if DFG dependencies are satisfied by inputs, 0 otherwise.
 proc test_dependencies {start_time_lst fu_id_lst} {
-	for {set i 0} {$i < [llength $start_time_lst]} {incr i} {
-		set node_pair [lindex $start_time_lst $i]
+	foreach node [get_nodes] {
+		set node_i [lsearch -index 0 $start_time_lst $node]
+		set node_pair [lindex $start_time_lst $node_i]
 		set node [lindex $node_pair 0]
 		set node_start [lindex $node_pair 1]
 		set fu_i [lsearch -index 0 $fu_id_lst $node]
