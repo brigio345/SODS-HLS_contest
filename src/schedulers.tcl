@@ -84,8 +84,10 @@ proc malc_brave {nodes_dict lambda} {
 
 		# set all fus as not "running"
 		set fus_running_dict [dict create]
+		set fus_max_running_dict [dict create]
 		foreach fu [get_lib_fus] {
 			dict set fus_running_dict $fu 0
+			dict set fus_max_running_dict $fu 0
 		}
 
 		set has_allocated 0
@@ -207,6 +209,16 @@ proc malc_brave {nodes_dict lambda} {
 					# update fus count
 					incr running
 					dict set fus_running_dict $fu $running
+					
+					# store the maximum number of contemporary
+					# running fus of each type (to know what
+					# are actually  used in this scheduling
+					# iteration)
+					set max_running [dict get $fus_max_running_dict $fu]
+					if {$running > $max_running} {
+						dict set fus_max_running_dict $fu $running
+					}
+
 					if {$running > $alloc} {
 						dict set fus_alloc_dict $fu $running
 
@@ -222,66 +234,14 @@ proc malc_brave {nodes_dict lambda} {
 			}
 		}
 
-		# check if all allocated fus are still associated to at least a
-		# scheduled node
+		# set fus_alloc_dict to fus_max_running_dict, which correspond
+		# to the actually used number of fus
 		# (it is possible that after slowing/allocating some fus are no
 		# more needed)
 		dict for {fu n_alloc} $fus_alloc_dict {
-			# collect start time of all nodes associated to the current fu
-			set start_lst [list]
-			dict for {node node_dict} $nodes_dict {
-				set node_fu [dict get $node_dict fu]
-				if {$node_fu == $fu} {
-					# check if current node is actually scheduled
-					# (it may just be associated to the fu by
-					# default)
-					if {[dict exists $node_dict t_sched] == 1} {
-						lappend start_lst [dict get $node_dict t_sched]
-					}
-				}
-			}
-
-			# sort list to make later checks easier
-			set $start_lst [lsort -integer $start_lst]
-			set delay [get_attribute $fu delay]
-			set end_lst [list]
-			foreach start $start_lst {
-				lappend end_lst [expr {$start + $delay}]
-			}
-
-			# find the maximum number of instances of the fu
-			# running at the same time
-			set n_alloc_max 0
-			for {set i 0} {$i < [llength $start_lst]} {incr i} {
-				set start_i [lindex $start_lst $i]
-				set end_i [lindex $end_lst $i]
-				set n_alloc 1
-
-				for {set j [expr {$i + 1}]} {$j < [llength $start_lst]} {incr j} {
-					set start_j [lindex $start_lst $j]
-					set end_j [lindex $end_lst $j]
-
-					# if interval of fu instance j intersects
-					# interval of instance i, it is needed to
-					# allocate one more resource
-					if {$start_j >= $start_i && $start_j < $end_i} {
-						incr n_alloc
-					}
-				}
-
-				if {$n_alloc > $n_alloc_max} {
-					set n_alloc_max $n_alloc
-				}
-			}
-
-			# remove no more needed fus (they were needed in previous iteration)
-			if {$n_alloc > $n_alloc_max} {
-				dict set fus_alloc_dict $fu $n_alloc_max
-			}
+			dict set fus_alloc_dict $fu [dict get $fus_max_running_dict $fu]
 		}
 	}
-
-	
 
 	# remove malc labels
 	dict for {node node_dict} $nodes_dict {
