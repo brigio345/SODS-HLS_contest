@@ -1,3 +1,59 @@
+source ./contest/src/brave_opt.tcl
+
+# test_suite:
+#	* argument(s):
+#		none.
+#	* return: 
+#		1 if all tests are passed, 0 otherwise.
+proc test_suite {} {
+	set DFGs_root "./data/DFGs/"
+
+	# TODO: find a better way to set lambda
+	set lambda 80
+
+	set success 1
+	foreach dfg [glob $DFGs_root/*.dot] {
+		puts "Testing DFG $dfg"
+		read_design $dfg
+
+		set res [brave_opt -lambda $lambda]
+
+		set start_time_lst [lindex $res 0]
+		set fu_id_lst [lindex $res 1]
+		set fu_alloc_lst [lindex $res 2]
+
+		puts -nonewline "Testing latency violations..."
+		if {[test_latency $start_time_lst $fu_id_lst $lambda] == 1} {
+			puts "\t\tOK"
+		} else {
+			puts "\t\tFAIL"
+			set success 0
+		}
+
+		puts -nonewline "Testing dependecies violations..."
+		if {[test_dependencies $start_time_lst $fu_id_lst] == 1} {
+			puts "\tOK"
+		} else {
+			puts "\tFAIL"
+			set success 0
+		}
+
+		puts -nonewline "Testing fus conflicts..."
+		if {[test_fu_conflicts $start_time_lst $fu_id_lst $fu_alloc_lst] == 1} {
+			puts "\t\tOK"
+		} else {
+			puts "\t\tFAIL"
+			set success 0
+		}
+
+		puts ""
+
+		remove_design
+	}
+
+	return $success
+}
+
 # test_latency:
 #	* argument(s):
 #		- start_time_lst: list of pairs <node_id, start_time>
@@ -67,7 +123,6 @@ proc test_dependencies {start_time_lst fu_id_lst} {
 #		type is equal to n_allocated, 0 otherwise.
 proc test_fu_conflicts {start_time_lst fu_id_lst fu_alloc_lst} {
 	foreach fu [get_lib_fus] {
-		puts -nonewline "Checking conflicts for functional unit $fu..."
 		set start_lst [list]
 		foreach fu_id_i [lsearch -all -index 1 $fu_id_lst $fu] {
 			set fu_id_pair [lindex $fu_id_lst $fu_id_i]
@@ -109,10 +164,8 @@ proc test_fu_conflicts {start_time_lst fu_id_lst fu_alloc_lst} {
 		set n_alloc [lindex $fu_alloc_pair 1]
 
 		if {$n_alloc != $n_alloc_max} {
-			puts "\tFAIL"
 			return 0
 		}
-		puts "\tOK"
 	}
 
 	return 1
