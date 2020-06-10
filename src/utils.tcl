@@ -47,10 +47,9 @@ proc get_reverse_sorted_nodes {nodes_dict} {
 	return $sorted_dict
 }
 
-# get_sorted_fus_per_op:
+# get_sorted_selected_fus_dict:
 #	* argument(s):
-#		- attr: attribute of functional unit, by which lists of
-#			functional units are sorted in ascending order.
+#		none.
 #	* return: 
 #		dictionary in which the key corresponds to operation
 #		and the value corresponds to list of a dictionary containing
@@ -59,35 +58,58 @@ proc get_reverse_sorted_nodes {nodes_dict} {
 #		the difference between the value of attibute of the specific
 #		functional unit and the minimum value possible for that operation
 #		with the current library of functional units.
-#		N.B. only operations present in the current design are included.
-proc get_sorted_fus_per_op {attr} {
+#		N.B.1 only "convenient" fus are returned (fastest or which reduce
+#			area or power or both)
+#		N.B.2 only operations present in the current design are included.
+proc get_sorted_selected_fus_dict {} {
 	set fus_dict [dict create]
 
 	foreach node [get_nodes] {
 		set op [get_attribute $node operation]
-		# avoid adding duplicates to the dictionary
+
+		# avoid adding duplicates
 		if {[dict exists $fus_dict $op] == 0} {
-			set op_fus [get_lib_fus_from_op $op]
-			set op_fus_dict [list]
-			# label functional units with their attribute
-			foreach op_fu $op_fus {
-				lappend op_fus_dict "$op_fu [get_attribute $op_fu $attr]"
+			# label fus with their delays (needed for sorting fus by delay)
+			set fu_delay_lst [list]
+			foreach op_fu [get_lib_fus_from_op $op] {
+				lappend fu_delay_lst "$op_fu [get_attribute $op_fu delay]"
 			}
-			# sort functional units according to the attribute
-			set op_fus_dict [lsort -real -index end $op_fus_dict]
-			set op_fus [list]
 
-			set min [lindex [lindex $op_fus_dict 0] 1]
-			# remove labels
-			foreach op_fu $op_fus_dict {
-				set fu [lindex $op_fu 0]
-				set delta [expr {[lindex $op_fu 1] - $min}]
+			set fu_delay_sorted_lst [lsort -integer -index 1 $fu_delay_lst]
+
+			# always include fastest fu
+			set fu [lindex [lindex $fu_delay_sorted_lst 0] 0]
+			set area [get_attribute $fu area]
+			set min_delay [get_attribute $fu delay]
+			set power [expr {[get_attribute $fu power] * $min_delay}]
+
+			set op_fu_dict [dict create fu $fu delta 0]
+			set sorted_op_fus_lst [list $op_fu_dict]
+
+			# filter out non-convenient fus
+			foreach fu_delay $fu_delay_sorted_lst {
+				set fu [lindex $fu_delay 0]
+				
+				set area_prev $area
+				set power_prev $power
+				set area [get_attribute $fu area]
+				set delay [get_attribute $fu delay]
+				set power [expr {[get_attribute $fu power] * $delay}]
+				
+				# skip current fu if it doesn't provide area or
+				# power improvements with respect to previous fu
+				# (which has a lower or equal delay)
+				if {$area >= $area_prev && $power >= $power_prev} {
+					continue
+				}
+
+				set delta [expr $delay - $min_delay]
+
 				set op_fu_dict [dict create fu $fu delta $delta]
-				lappend op_fus $op_fu_dict
+				lappend sorted_op_fus_lst $op_fu_dict
 			}
-
-			# add the value to the dictionary
-			dict set fus_dict $op $op_fus
+			
+			dict set fus_dict $op $sorted_op_fus_lst
 		}
 	}
 

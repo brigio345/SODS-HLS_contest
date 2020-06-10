@@ -43,7 +43,7 @@ proc alap_sched {nodes_dict lambda} {
 #			2. fu: functional unit (chosen trying to minimize area
 #				and power consumption)
 proc malc_brave {nodes_dict lambda} {
-	set fus_dict [get_sorted_fus_per_op delay]
+	set fus_dict [get_sorted_selected_fus_dict]
 
 	# do not allocate any fu at the beginnning
 	set fus_alloc_dict [dict create]
