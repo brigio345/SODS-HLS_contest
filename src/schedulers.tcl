@@ -60,6 +60,11 @@ proc malc_brave {nodes_dict lambda} {
 		set waiting_lst [list]
 		set running_lst [list]
 
+		# sorting nodes by sink distance so that most critical nodes
+		# are scheduled first: it has been empirically proven that this
+		# may lead to lower total area
+		set nodes_dict [get_sorted_nodes_by_sink_dist $nodes_dict]
+
 		# initialization
 		dict for {node node_dict} $nodes_dict {
 			set op [get_attribute $node operation]
