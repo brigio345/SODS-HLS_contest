@@ -117,7 +117,7 @@ proc get_sorted_nodes_by_sink_dist {nodes_dict} {
 #		functional unit and the minimum value possible for that operation
 #		with the current library of functional units.
 #		N.B.1 only "convenient" fus are returned (fastest or which reduce
-#			area or power or both)
+#			power or area)
 #		N.B.2 only operations present in the current design are included.
 proc get_sorted_selected_fus_dict {} {
 	set fus_dict [dict create]
@@ -154,10 +154,12 @@ proc get_sorted_selected_fus_dict {} {
 				set delay [get_attribute $fu delay]
 				set power [expr {[get_attribute $fu power] * $delay}]
 				
-				# skip current fu if it doesn't provide area or
-				# power improvements with respect to previous fu
-				# (which has a lower or equal delay)
-				if {$area >= $area_prev && $power >= $power_prev} {
+				# skip current fu if it leads to higher power or
+				# it leads to the same power and same or bigger
+				# area, with respect to previous fu (which has a
+				# lower or equal delay)
+				if {$power > $power_prev ||
+					($power == $power_prev && $area >= $area_prev)} {
 					continue
 				}
 
