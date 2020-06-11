@@ -51,6 +51,11 @@ proc malc_brave {nodes_dict lambda} {
 		dict set fus_alloc_dict $fu 0
 	}
 
+	# sorting nodes by sink distance so that most critical nodes are
+	# scheduled first: it has been empirically proven that this  may lead to
+	# lower total area
+	set nodes_dict [get_sorted_nodes_by_sink_dist $nodes_dict]
+
 	set has_slowed 1
 	# repeat until a node has slowed or a fu has allocated
 	while {$has_slowed == 1 || $has_allocated == 1} {
@@ -59,11 +64,6 @@ proc malc_brave {nodes_dict lambda} {
 		set ready_lst [list]
 		set waiting_lst [list]
 		set running_lst [list]
-
-		# sorting nodes by sink distance so that most critical nodes
-		# are scheduled first: it has been empirically proven that this
-		# may lead to lower total area
-		set nodes_dict [get_sorted_nodes_by_sink_dist $nodes_dict]
 
 		# initialization
 		dict for {node node_dict} $nodes_dict {
@@ -174,6 +174,10 @@ proc malc_brave {nodes_dict lambda} {
 
 						dict set node_dict fu_index $fu_index
 						dict set node_dict fu [dict get $fu_dict fu]
+
+						# after substituting a fu, sink distances are modified:
+						# need of sorting again
+						set nodes_dict [get_sorted_nodes_by_sink_dist $nodes_dict]
 
 						# update new slack
 						set slack [expr {$t_alap_slowed - $t}]
