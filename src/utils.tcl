@@ -47,6 +47,47 @@ proc get_reverse_sorted_nodes {nodes_dict} {
 	return $sorted_dict
 }
 
+# get_sorted_nodes_by_sink_dist:
+#	* argument(s):
+#		- nodes_dict: dictionary in which keys correspond to nodes and
+#			values correspond to information about the key node.
+#			N.B. fu of each node is required
+#	* return: 
+#		nodes_dict sorted by sink distance (weighted on the delay
+#		of nodes), in descending order.
+proc get_sorted_nodes_by_sink_dist {nodes_dict} {
+	set nodes_dict [get_reverse_sorted_nodes $nodes_dict]
+
+	set node_dist_lst [list]
+	dict for {node node_dict} $nodes_dict {
+		set max_child_dist 0
+		foreach child [get_attribute $node children] {
+			set child_dist_pair [lsearch -index 0 -inline $node_dist_lst $child]
+			set child_dist [lindex $child_dist_pair 1]
+			if {$child_dist > $max_child_dist} {
+				set max_child_dist $child_dist
+			}
+		}
+
+		set fu [dict get $node_dict fu]
+		set delay [get_attribute $fu delay]
+		set dist [expr {$max_child_dist + $delay}]
+
+		lappend node_dist_lst [list $node $dist]
+	}
+
+	set node_dist_sorted_lst [lsort -index 1 -integer -decreasing $node_dist_lst]
+
+	set nodes_sorted_dict [dict create]
+	foreach node_dist_pair $node_dist_sorted_lst {
+		set node [lindex $node_dist_pair 0]
+		set node_dict [dict get $nodes_dict $node]
+		dict set nodes_sorted_dict $node $node_dict
+	}
+
+	return $nodes_sorted_dict
+}
+
 # get_sorted_selected_fus_dict:
 #	* argument(s):
 #		none.
