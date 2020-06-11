@@ -116,3 +116,41 @@ proc get_sorted_selected_fus_dict {} {
 	return $fus_dict
 }
 
+# get_total_area:
+#	* argument(s):
+#		- fus_alloc_lst: list of pairs <fu_id, n_allocated>
+#	* return: 
+#		total allocated area
+proc get_total_area {fus_alloc_lst} {
+	set total_area 0
+	foreach fu_alloc_lst $fus_alloc_lst {
+		set fu [lindex $fu_alloc_lst 0]
+		set alloc [lindex $fu_alloc_lst 1]
+		set area [get_attribute $fu area]
+
+		set total_area [expr {$total_area + $area * $alloc}]
+	}
+
+	return $total_area
+}
+
+# get_total_power:
+#	* argument(s):
+#		- nodes_fu_lst: list of pairs <node_id, fu_id>
+#	* return: 
+#		total consumed power
+proc get_total_power {nodes_fu_lst} {
+	# TODO: check what lambda means in the provided formula
+	set total_power 0
+	foreach node_fu_lst $nodes_fu_lst {
+		set node [lindex $node_fu_lst 0]
+		set fu [lindex $node_fu_lst 1]
+		set power [get_attribute $fu power]
+		set delay [get_attribute $fu delay]
+
+		set total_power [expr {$total_power + $power * $delay}]
+	}
+
+	return $total_power
+}
+
