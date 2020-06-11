@@ -24,7 +24,6 @@ proc test_suite {} {
 
 		set end_time [clock clicks -milliseconds]
 
-		puts "Execution time... \t\t\t[expr {$end_time - $start_time}] ms"
 
 		set start_time_lst [lindex $res 0]
 		set fu_id_lst [lindex $res 1]
@@ -53,6 +52,12 @@ proc test_suite {} {
 			puts "\t\tFAIL"
 			set success 0
 		}
+
+		puts "INFO:"
+
+		puts "CPU execution time: \t\t\t[expr {$end_time - $start_time}] ms"
+		puts "Total power: \t\t\t\t[get_total_power [lindex $res 1]]"
+		puts "Total area: \t\t\t\t[get_total_area [lindex $res 2]]"
 
 		puts ""
 
