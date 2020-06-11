@@ -56,24 +56,41 @@ proc get_reverse_sorted_nodes {nodes_dict} {
 #		nodes_dict sorted by sink distance (weighted on the delay
 #		of nodes), in descending order.
 proc get_sorted_nodes_by_sink_dist {nodes_dict} {
-	set nodes_dict [get_reverse_sorted_nodes $nodes_dict]
-
+	set sorted_dict [dict create]
+	set unlabeled_lst [dict keys $nodes_dict]
 	set node_dist_lst [list]
-	dict for {node node_dict} $nodes_dict {
-		set max_child_dist 0
-		foreach child [get_attribute $node children] {
-			set child_dist_pair [lsearch -index 0 -inline $node_dist_lst $child]
-			set child_dist [lindex $child_dist_pair 1]
-			if {$child_dist > $max_child_dist} {
-				set max_child_dist $child_dist
+
+	while {[llength $unlabeled_lst] > 0} {
+		foreach node $unlabeled_lst {
+			set all_child_labeled 1
+			set childs_dist_lst [list]
+			foreach child [get_attribute $node children] {
+				set child_dist_pair [lsearch -index 0 -inline $node_dist_lst $child]
+				if {$child_dist_pair == ""} {
+					set all_child_labeled 0
+					break
+				}
+				lappend childs_dist_lst $child_dist_pair
+			}
+			if {$all_child_labeled == 1} {
+				lremove unlabeled_lst $node
+
+				set max_child_dist 0
+				foreach child_dist_pair $childs_dist_lst {
+					set child_dist [lindex $child_dist_pair 1]
+					if {$child_dist > $max_child_dist} {
+						set max_child_dist $child_dist
+					}
+				}
+				
+				set node_dict [dict get $nodes_dict $node]
+				set fu [dict get $node_dict fu]
+				set delay [get_attribute $fu delay]
+				set dist [expr {$max_child_dist + $delay}]
+
+				lappend node_dist_lst [list $node $dist]
 			}
 		}
-
-		set fu [dict get $node_dict fu]
-		set delay [get_attribute $fu delay]
-		set dist [expr {$max_child_dist + $delay}]
-
-		lappend node_dist_lst [list $node $dist]
 	}
 
 	set node_dist_sorted_lst [lsort -index 1 -integer -decreasing $node_dist_lst]
