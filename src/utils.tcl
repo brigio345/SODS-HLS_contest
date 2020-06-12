@@ -180,7 +180,7 @@ proc get_sorted_selected_fus_dict {} {
 				# area, with respect to previous fu (which has a
 				# lower or equal delay)
 				if {$power > $power_prev ||
-						($power == $power_prev && $area >= $area_prev)} {
+						($power == $power_prev && $area > $area_prev)} {
 					continue
 				}
 
