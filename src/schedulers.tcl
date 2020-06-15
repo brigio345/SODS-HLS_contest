@@ -51,9 +51,9 @@ proc malc_brave {nodes_dict lambda} {
 		dict set fus_alloc_dict $fu 0
 	}
 
-	# sorting nodes by slack so that most critical nodes are
-	# scheduled first: it has been empirically proven that this  may lead to
-	# lower total area
+	# sorting nodes by t_alap forces to schedule first most critical nodes,
+	# not only when their slack is 0, but also on "free" resources:
+	# this may reduce the number of allocated resources, thus reducing area
 	set nodes_dict [get_sorted_nodes_by_t_alap $nodes_dict]
 
 	set has_slowed 1
