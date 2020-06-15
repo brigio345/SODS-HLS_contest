@@ -73,64 +73,6 @@ proc get_sorted_nodes_by_t_alap {nodes_dict} {
 	return $nodes_sorted_dict
 }
 
-# get_sorted_nodes_by_sink_dist:
-#	* argument(s):
-#		- nodes_dict: dictionary in which keys correspond to nodes and
-#			values correspond to information about the key node.
-#			N.B. fu of each node is required
-#	* return: 
-#		nodes_dict sorted by sink distance (weighted on the delay
-#		of nodes), in descending order.
-proc get_sorted_nodes_by_sink_dist {nodes_dict} {
-	set sorted_dict [dict create]
-	set unlabeled_lst [dict keys $nodes_dict]
-	set node_dist_lst [list]
-
-	while {[llength $unlabeled_lst] > 0} {
-		foreach node $unlabeled_lst {
-			set all_child_labeled 1
-			set childs_dist_lst [list]
-			foreach child [get_attribute $node children] {
-				set child_dist_pair [lsearch -index 0 -inline $node_dist_lst $child]
-				if {$child_dist_pair == ""} {
-					set all_child_labeled 0
-					break
-				}
-				lappend childs_dist_lst $child_dist_pair
-			}
-			if {$all_child_labeled == 1} {
-				lremove unlabeled_lst $node
-
-				set max_child_dist 0
-				foreach child_dist_pair $childs_dist_lst {
-					set child_dist [lindex $child_dist_pair 1]
-					if {$child_dist > $max_child_dist} {
-						set max_child_dist $child_dist
-					}
-				}
-				
-				set node_dict [dict get $nodes_dict $node]
-				set fu [dict get $node_dict fu]
-				set delay [get_attribute $fu delay]
-				set dist [expr {$max_child_dist + $delay}]
-
-				lappend node_dist_lst [list $node $dist]
-			}
-		}
-	}
-
-	set node_dist_sorted_lst [lsort -index 1 -integer -decreasing $node_dist_lst]
-
-	set nodes_sorted_dict [dict create]
-	foreach node_dist_pair $node_dist_sorted_lst {
-		set node [lindex $node_dist_pair 0]
-		set node_dict [dict get $nodes_dict $node]
-		dict set nodes_sorted_dict $node $node_dict
-	}
-
-	return $nodes_sorted_dict
-}
-
 # get_sorted_selected_fus_dict:
 #	* argument(s):
 #		none.
