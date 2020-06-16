@@ -62,39 +62,39 @@ proc malc_brave {nodes_dict lambda} {
 	while {$has_slowed == 1 || $restarted == 1} {
 		set has_slowed 0
 
-		set ready_lst [list]
-		set waiting_lst [list]
-		set running_lst [list]
-
 		# initialization
-		dict for {node node_dict} $nodes_dict {
-			set op [get_attribute $node operation]
-			# get fus implementing the operation of current node
-			set fus_lst [dict get $fus_dict $op]
-			set fu_index [dict get $node_dict fu_index]
 
-			# at the beginning a node is slowable if it is not
-			# associated with the latest fu of fus_list (which is
-			# the slowest)
-			# N.B. nodes are made slowable only when previous
-			# scheduling iteration has been completely performed
-			# (i.e. it wasn't restarted due to a new fu allocation)
-			# or when the first iteration is being executed:
-			# this is to avoid slowing down only first nodes in
-			# topological order
-			if {$restarted == 0} {
+		# at the beginning a node is slowable if it is not
+		# associated with the latest fu of fus_list (which is
+		# the slowest)
+		# N.B. nodes are made slowable only when previous
+		# scheduling iteration has been completely performed
+		# (i.e. it wasn't restarted due to a new fu allocation)
+		# or when the first iteration is being executed:
+		# this is to avoid slowing down only first nodes in
+		# topological order
+		if {$restarted == 0} {
+			dict for {node node_dict} $nodes_dict {
+				set op [get_attribute $node operation]
+				# get fus implementing the operation of current node
+				set fus_lst [dict get $fus_dict $op]
+				set fu_index [dict get $node_dict fu_index]
+
 				if {$fu_index < [llength $fus_lst] - 1} {
 					dict set node_dict slowable 1
 				} else {
 					dict set node_dict slowable 0
 				}
+
+				dict set nodes_dict $node $node_dict
 			}
-
-			dict set nodes_dict $node $node_dict
-
-			# set all nodes as "waiting"
-			lappend waiting_lst $node
 		}
+
+		# set all nodes as "waiting"
+		set waiting_lst [dict keys $nodes_dict]
+		# set no node as "ready" or "running"
+		set ready_lst [list]
+		set running_lst [list]
 
 		# set all fus as not "running"
 		set fus_running_dict [dict create]
