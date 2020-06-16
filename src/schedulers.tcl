@@ -64,9 +64,8 @@ proc malc_brave {nodes_dict lambda} {
 
 		# initialization
 
-		# at the beginning a node is slowable if it is not
-		# associated with the latest fu of fus_list (which is
-		# the slowest)
+		# at the beginning a node is slowable if it is not associated
+		# to the latest fu of fus_list (which is the slowest)
 		# N.B. nodes are made slowable only when previous
 		# scheduling iteration has been completely performed
 		# (i.e. it wasn't restarted due to a new fu allocation)
@@ -76,11 +75,11 @@ proc malc_brave {nodes_dict lambda} {
 		if {$restarted == 0} {
 			dict for {node node_dict} $nodes_dict {
 				set op [get_attribute $node operation]
-				# get fus implementing the operation of current node
-				set fus_lst $fus_arr($op)
+				# get fus implementing the operation of
+				# current node
 				set fu_index [dict get $node_dict fu_index]
 
-				if {$fu_index < [llength $fus_lst] - 1} {
+				if {$fu_index < [llength $fus_arr($op)] - 1} {
 					dict set node_dict slowable 1
 				} else {
 					dict set node_dict slowable 0
@@ -115,8 +114,8 @@ proc malc_brave {nodes_dict lambda} {
 			foreach node $waiting_lst {
 				set ready 1
 
-				# check if all parents are scheduled (not present in ready
-				# or waiting lists)
+				# check if all parents are scheduled
+				# (not present in ready or waiting lists)
 				foreach parent [get_attribute $node parents] {
 					if {[lsearch $waiting_lst $parent] != -1 ||
 							[lsearch $ready_lst $parent] != -1} {
@@ -165,27 +164,31 @@ proc malc_brave {nodes_dict lambda} {
 					set fu_index [dict get $node_dict fu_index]
 					# move to the next slower fu
 					incr fu_index
-					# get functional units implementing current node operation
+					# get functional units implementing
+					# current node operation
 					set op [get_attribute $node operation]
 					set fus_lst $fus_arr($op)
 					# get dictionary of the new fu
 					set fu_dict [lindex $fus_lst $fu_index]
-					# check if the latency constraint would be still satisfied
-					# with the new fu
+					# check if the latency constraint would
+					# be still satisfied with the new fu
 					set delta [dict get $fu_dict delta]
 					set t_alap_slowed [expr {$t_alap - $delta}]
+
+					# if current node, after slowing it down
+					# can be still scheduled at time t or
+					# later, it can be slowed down
 					if {$t_alap_slowed >= $t} {
 						# update the flag
 						set has_slowed 1
 						# update t_alap with new resource
-						# set nodes_dict [update_t_alap $node $nodes_dict $delta]
 						dict set node_dict t_alap $t_alap_slowed
 
 						dict set node_dict fu_index $fu_index
 						dict set node_dict fu [dict get $fu_dict fu]
 
-						# after substituting a fu, sink distances are modified:
-						# need of sorting again
+						# after substituting a fu, t_alap
+						# are modified: need of sorting again
 						set nodes_dict [get_sorted_nodes_by_t_alap $nodes_dict]
 
 						# update new slack
