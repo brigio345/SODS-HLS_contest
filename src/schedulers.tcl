@@ -226,30 +226,35 @@ proc malc_brave {nodes_dict lambda} {
 					set max_running [dict get $fus_max_running_dict $fu]
 					if {$running > $max_running} {
 						dict set fus_max_running_dict $fu $running
+
+						# when running > alloc it is
+						# necessary to allocate a new fu
+						if {$running > $alloc} {
+							# restart the scheduling
+							# every time a fu is added
+							# N.B. all data structures
+							# are re-initialized,
+							# except for fus_alloc_dict,
+							# so that previous scheduling
+							# steps will be aware of
+							# fus which are allocated
+							# later and can make use
+							# of them
+							set has_allocated 1
+							break
+						}
 					}
 
-					if {$running > $alloc} {
-						dict set fus_alloc_dict $fu $running
-
-						# repeat the scheduling every time
-						# a functional unit is added
-						# N.B. this brings execution back
-						# to initialization (only fus_alloc_dict
-						# is kept)
-						set has_allocated 1
-						break
-					}
 				}
 			}
 		}
 
-		# set fus_alloc_dict to fus_max_running_dict, which correspond
-		# to the actually used number of fus
-		# (it is possible that after slowing/allocating some fus are no
-		# more needed)
-		dict for {fu n_alloc} $fus_alloc_dict {
-			dict set fus_alloc_dict $fu [dict get $fus_max_running_dict $fu]
-		}
+		# Update fus_alloc_dict with actually used fus:
+		# - it is necessary to allocate a number of fus equal to the
+		# maximum number of contemporary running fus of each type
+		# - it is possible that some fus allocated in previous scheduling
+		# iteration are no more needed
+		set fus_alloc_dict $fus_max_running_dict
 	}
 
 	# remove malc labels
