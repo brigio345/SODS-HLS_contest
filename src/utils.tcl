@@ -21,10 +21,7 @@ proc lremove {list_variable value} {
 proc get_reverse_sorted_nodes {nodes_dict} {
 	set sorted_dict [dict create]
 
-	set unsorted_lst [list]
-	foreach node [dict keys $nodes_dict] {
-		lappend unsorted_lst $node
-	}
+	set unsorted_lst [dict keys $nodes_dict]
 
 	while {[llength $unsorted_lst] > 0} {
 		foreach node $unsorted_lst {
