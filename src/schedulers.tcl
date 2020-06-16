@@ -12,9 +12,8 @@ source ./contest/src/utils.tcl
 proc alap_sched {nodes_dict lambda} {
 	# iterate all nodes, in a reverse topological order
 	# (so that it is always considered a node with all descendant scheduled)
-	foreach node [dict keys [get_reverse_sorted_nodes $nodes_dict]] {
-		array set node_arr [dict get $nodes_dict $node]
-		set node_delay [get_attribute $node_arr(fu) delay]
+	dict for {node node_dict} [get_reverse_sorted_nodes $nodes_dict] {
+		set node_delay [get_attribute [dict get $node_dict fu] delay]
 		set t_alap [expr {$lambda - $node_delay}]
 		foreach child [get_attribute $node children] {
 			set child_dict [dict get $nodes_dict $child]
@@ -25,8 +24,8 @@ proc alap_sched {nodes_dict lambda} {
 			}
 		}
 
-		set node_arr(t_alap) $t_alap
-		dict set nodes_dict $node [array get node_arr]
+		dict set node_dict t_alap $t_alap
+		dict set nodes_dict $node $node_dict
 	}
 
 	return $nodes_dict
@@ -44,7 +43,7 @@ proc alap_sched {nodes_dict lambda} {
 #			2. fu: functional unit (chosen trying to minimize area
 #				and power consumption)
 proc malc_brave {nodes_dict lambda} {
-	array set fus_arr [get_sorted_selected_fus_arr]
+	set fus_dict [get_sorted_selected_fus_dict]
 
 	# do not allocate any fu at the beginnning
 	set fus_alloc_dict [dict create]
@@ -63,42 +62,45 @@ proc malc_brave {nodes_dict lambda} {
 	while {$has_slowed == 1 || $restarted == 1} {
 		set has_slowed 0
 
-		# initialization
-
-		# at the beginning a node is slowable if it is not
-		# associated with the latest fu of fus_list (which is
-		# the slowest)
-		# N.B. nodes are made slowable only when previous
-		# scheduling iteration has been completely performed
-		# (i.e. it wasn't restarted due to a new fu allocation)
-		# or when the first iteration is being executed:
-		# this is to avoid slowing down only first nodes in
-		# topological order
-		if {$restarted == 0} {
-			foreach node [dict keys $nodes_dict] {
-				array set node_arr [dict get $nodes_dict $node]
-				set op [get_attribute $node operation]
-
-				if {$node_arr(fu_index) < [llength $fus_arr($op)] - 1} {
-					set node_arr(slowable) 1
-				} else {
-					set node_arr(slowable) 0
-				}
-
-				dict set nodes_dict $node [array get node_arr]
-			}
-		}
-
-		# set all nodes as "waiting"
-		set waiting_lst [dict keys $nodes_dict]
-		# set no node as "ready" and "running"
 		set ready_lst [list]
+		set waiting_lst [list]
 		set running_lst [list]
 
+		# initialization
+		dict for {node node_dict} $nodes_dict {
+			set op [get_attribute $node operation]
+			# get fus implementing the operation of current node
+			set fus_lst [dict get $fus_dict $op]
+			set fu_index [dict get $node_dict fu_index]
+
+			# at the beginning a node is slowable if it is not
+			# associated with the latest fu of fus_list (which is
+			# the slowest)
+			# N.B. nodes are made slowable only when previous
+			# scheduling iteration has been completely performed
+			# (i.e. it wasn't restarted due to a new fu allocation)
+			# or when the first iteration is being executed:
+			# this is to avoid slowing down only first nodes in
+			# topological order
+			if {$restarted == 0} {
+				if {$fu_index < [llength $fus_lst] - 1} {
+					dict set node_dict slowable 1
+				} else {
+					dict set node_dict slowable 0
+				}
+			}
+
+			dict set nodes_dict $node $node_dict
+
+			# set all nodes as "waiting"
+			lappend waiting_lst $node
+		}
+
 		# set all fus as not "running"
+		set fus_running_dict [dict create]
 		set fus_max_running_dict [dict create]
 		foreach fu [get_lib_fus] {
-			set fus_running_arr($fu) 0
+			dict set fus_running_dict $fu 0
 			dict set fus_max_running_dict $fu 0
 		}
 
@@ -130,26 +132,26 @@ proc malc_brave {nodes_dict lambda} {
 			}
 
 			# check what nodes has completed at time t
-			# and update fus_running_arr accordingly
+			# and update fus_running_dict accordingly
 			foreach node $running_lst {
-				array set node_arr [dict get $nodes_dict $node]
+				set node_dict [dict get $nodes_dict $node]
 
-				set fu $node_arr(fu)
+				set t_sched [dict get $node_dict t_sched]
+				set fu [dict get $node_dict fu]
 				set delay [get_attribute $fu delay]
 
-				# if current node has completed, remove it from
-				# running_lst and update fus_running_arr with
-				# one less running fu
-				if {$t >= $node_arr(t_sched) + $delay} {
+				if {$t >= $t_sched + $delay} {
 					lremove running_lst $node
-					set fus_running_arr($fu) [expr {$fus_running_arr($fu) - 1}]
+					set running [dict get $fus_running_dict $fu]
+					incr running -1
+					dict set fus_running_dict $fu $running
 				}
 			}
 
 			foreach node $ready_lst {
-				array set node_arr [dict get $nodes_dict $node]
+				set node_dict [dict get $nodes_dict $node]
 
-				set t_alap $node_arr(t_alap)
+				set t_alap [dict get $node_dict t_alap]
 				set slack [expr {$t_alap - $t}]
 
 				# When slack is positive and node is slowable
@@ -158,27 +160,29 @@ proc malc_brave {nodes_dict lambda} {
 				# constraint.
 				# Proceed only if node hasn't already been
 				# slowed down in this iteration.
-				if {$slack > 0 && $node_arr(slowable) == 1} {
+				if {$slack > 0 && [dict get $node_dict slowable] == 1} {
 					# get current fu index
-					set fu_index $node_arr(fu_index)
+					set fu_index [dict get $node_dict fu_index]
 					# move to the next slower fu
 					incr fu_index
 					# get functional units implementing current node operation
 					set op [get_attribute $node operation]
-					# get array of the new fu
-					array set fu_arr [lindex $fus_arr($op) $fu_index]
+					set fus_lst [dict get $fus_dict $op]
+					# get dictionary of the new fu
+					set fu_dict [lindex $fus_lst $fu_index]
 					# check if the latency constraint would be still satisfied
 					# with the new fu
-					set t_alap_slowed [expr {$t_alap - $fu_arr(delta)}]
+					set delta [dict get $fu_dict delta]
+					set t_alap_slowed [expr {$t_alap - $delta}]
 					if {$t_alap_slowed >= $t} {
 						# update the flag
 						set has_slowed 1
 						# update t_alap with new resource
 						# set nodes_dict [update_t_alap $node $nodes_dict $delta]
-						set node_arr(t_alap) $t_alap_slowed
+						dict set node_dict t_alap $t_alap_slowed
 
-						set node_arr(fu_index) $fu_index
-						set node_arr(fu) $fu_arr(fu)
+						dict set node_dict fu_index $fu_index
+						dict set node_dict fu [dict get $fu_dict fu]
 
 						# after substituting a fu, sink distances are modified:
 						# need of sorting again
@@ -201,28 +205,28 @@ proc malc_brave {nodes_dict lambda} {
 					#		it can be replaced in
 					#		next iterations, since
 					#		the slack will decrease
-					set node_arr(slowable) 0
+					dict set node_dict slowable 0
 
-					dict set nodes_dict $node [array get node_arr]
+					dict set nodes_dict $node $node_dict
 				}
 
-				set fu $node_arr(fu)
+				set fu [dict get $node_dict fu]
 
-				set running $fus_running_arr($fu)
+				set running [dict get $fus_running_dict $fu]
 				set alloc [dict get $fus_alloc_dict $fu]
 				# schedule node with no more positive slack or
 				# which do not require additional fu
 				if {$slack == 0 || $running < $alloc} {
 					# annotate scheduled node with t_sched
-					set node_arr(t_sched) $t
-					dict set nodes_dict $node [array get node_arr]
+					dict set node_dict t_sched $t
+					dict set nodes_dict $node $node_dict
 					# remove scheduled node from ready_lst
 					lremove ready_lst $node
 					lappend running_lst $node
 
 					# update fus count
 					incr running
-					set fus_running_arr($fu) $running
+					dict set fus_running_dict $fu $running
 					
 					# store the maximum number of contemporary
 					# running fus of each type (to know what
@@ -263,10 +267,9 @@ proc malc_brave {nodes_dict lambda} {
 	}
 
 	# remove malc labels
-	foreach node [dict keys $nodes_dict] {
-		array set node_arr [dict get $nodes_dict $node]
-		array unset node_arr slowable
-		dict set nodes_dict $node [array get node_arr]
+	dict for {node node_dict} $nodes_dict {
+		set node_dict [dict remove $node_dict slowable]
+		dict set nodes_dict $node $node_dict
 	}
 
 	return [dict create nodes $nodes_dict fus $fus_alloc_dict]

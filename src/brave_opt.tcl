@@ -19,16 +19,17 @@ proc brave_opt args {
 
 	puts $latency_value
 
-	array set fus_arr [get_sorted_selected_fus_arr]
+	set fus_dict [get_sorted_selected_fus_dict]
 	set nodes_dict [dict create]
 
 	# associate nodes to fastest resources
 	foreach node [get_nodes] {
 		set op [get_attribute $node operation]
-		array set fu_arr [lindex $fus_arr($op) 0]
-		array set node_arr "fu_index 0 fu $fu_arr(fu)"
-
-		dict set nodes_dict $node [array get node_arr]
+		set fu_dict [lindex [dict get $fus_dict $op] 0]
+		set fu [dict get $fu_dict fu]
+		set node_dict [dict create fu_index 0]
+		dict set node_dict fu $fu
+		dict set nodes_dict $node $node_dict
 	}
 
 	# label nodes with last possible start time (with fastest resources)
@@ -47,10 +48,9 @@ proc brave_opt args {
 
 	set start_time_lst [list]
 	set fu_id_lst [list]
-	foreach node [dict keys $nodes_dict] {
-		array set node_arr [dict get $nodes_dict $node]
-		lappend start_time_lst "$node $node_arr(t_sched)"
-		lappend fu_id_lst "$node $node_arr(fu)"
+	dict for {node node_dict} $nodes_dict {
+		lappend start_time_lst "$node [dict get $node_dict t_sched]"
+		lappend fu_id_lst "$node [dict get $node_dict fu]"
 	}
 
 	set fus_dict [dict get $res_dict fus]
