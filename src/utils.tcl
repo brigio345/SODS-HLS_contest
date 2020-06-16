@@ -21,10 +21,7 @@ proc lremove {list_variable value} {
 proc get_reverse_sorted_nodes {nodes_dict} {
 	set sorted_dict [dict create]
 
-	set unsorted_lst [list]
-	foreach node [dict keys $nodes_dict] {
-		lappend unsorted_lst $node
-	}
+	set unsorted_lst [dict keys $nodes_dict]
 
 	while {[llength $unsorted_lst] > 0} {
 		foreach node $unsorted_lst {
@@ -56,9 +53,9 @@ proc get_reverse_sorted_nodes {nodes_dict} {
 #		nodes_dict sorted by t_alap in descending order.
 proc get_sorted_nodes_by_t_alap {nodes_dict} {
 	set nodes_t_alap_lst [list]
-	dict for {node node_dict} $nodes_dict {
-		set t_alap [dict get $node_dict t_alap]
-		lappend nodes_t_alap_lst [list $node $t_alap]
+	foreach node [dict keys $nodes_dict] {
+		array set node_arr [dict get $nodes_dict $node]
+		lappend nodes_t_alap_lst [list $node $node_arr(t_alap)]
 	}
 
 	set nodes_t_alap_lst [lsort -index 1 -integer $nodes_t_alap_lst]
@@ -66,19 +63,18 @@ proc get_sorted_nodes_by_t_alap {nodes_dict} {
 	set nodes_sorted_dict [dict create]
 	foreach node_t_alap_pair $nodes_t_alap_lst {
 		set node [lindex $node_t_alap_pair 0]
-		set node_dict [dict get $nodes_dict $node]
-		dict set nodes_sorted_dict $node $node_dict
+		dict set nodes_sorted_dict $node [dict get $nodes_dict $node]
 	}
 
 	return $nodes_sorted_dict
 }
 
-# get_sorted_selected_fus_dict:
+# get_sorted_selected_fus_arr:
 #	* argument(s):
 #		none.
 #	* return: 
-#		dictionary in which the key corresponds to operation
-#		and the value corresponds to list of a dictionary containing
+#		array in which the key corresponds to operation
+#		and the value corresponds to list of arrays containing
 #		the functional units implementing the key operation, sorted
 #		by attr, in ascending order, and the delta, corresponding to
 #		the difference between the value of attibute of the specific
@@ -87,14 +83,14 @@ proc get_sorted_nodes_by_t_alap {nodes_dict} {
 #		N.B.1 only "convenient" fus are returned (fastest or which reduce
 #			power or area)
 #		N.B.2 only operations present in the current design are included.
-proc get_sorted_selected_fus_dict {} {
-	set fus_dict [dict create]
+proc get_sorted_selected_fus_arr {} {
+	array set fus_arr {}
 
 	foreach node [get_nodes] {
 		set op [get_attribute $node operation]
 
 		# avoid adding duplicates
-		if {[dict exists $fus_dict $op] == 0} {
+		if {[array get fus_arr $op] == ""} {
 			# label fus with their area, delay and power
 			# (needed for sorting)
 			set fu_specs_lst [list]
@@ -120,8 +116,9 @@ proc get_sorted_selected_fus_dict {} {
 			set min_delay $delay
 			set power [lindex $fu_specs 2]
 			set area [lindex $fu_specs 3]
-			set op_fu_dict [dict create fu $fu delta 0]
-			set sorted_op_fus_lst [list $op_fu_dict]
+			set op_fu_arr(fu) $fu
+			set op_fu_arr(delta) 0
+			set sorted_op_fus_lst [list [array get op_fu_arr]]
 
 			# filter out non-convenient fus
 			foreach fu_specs $fu_specs_sorted_lst {
@@ -155,15 +152,17 @@ proc get_sorted_selected_fus_dict {} {
 				set fu [lindex $fu_specs 0]
 				set delta [expr $delay - $min_delay]
 
-				set op_fu_dict [dict create fu $fu delta $delta]
-				lappend sorted_op_fus_lst $op_fu_dict
+				set op_fu_arr(fu) $fu
+				set op_fu_arr(delta) $delta
+
+				lappend sorted_op_fus_lst [array get op_fu_arr]
 			}
 			
-			dict set fus_dict $op $sorted_op_fus_lst
+			set fus_arr($op) $sorted_op_fus_lst
 		}
 	}
 
-	return $fus_dict
+	return [array get fus_arr]
 }
 
 # get_total_area:
