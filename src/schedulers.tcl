@@ -57,8 +57,9 @@ proc malc_brave {nodes_dict lambda} {
 	set nodes_dict [get_sorted_nodes_by_t_alap $nodes_dict]
 
 	set has_slowed 1
+	set restarted 0
 	# repeat until a node has slowed or a fu has allocated
-	while {$has_slowed == 1 || $has_allocated == 1} {
+	while {$has_slowed == 1 || $restarted == 1} {
 		set has_slowed 0
 
 		set ready_lst [list]
@@ -75,10 +76,18 @@ proc malc_brave {nodes_dict lambda} {
 			# at the beginning a node is slowable if it is not
 			# associated with the latest fu of fus_list (which is
 			# the slowest)
-			if {$fu_index < [llength $fus_lst] - 1} {
-				dict set node_dict slowable 1
-			} else {
-				dict set node_dict slowable 0
+			# N.B. nodes are made slowable only when previous
+			# scheduling iteration has been completely performed
+			# (i.e. it wasn't restarted due to a new fu allocation)
+			# or when the first iteration is being executed:
+			# this is to avoid slowing down only first nodes in
+			# topological order
+			if {$restarted == 0} {
+				if {$fu_index < [llength $fus_lst] - 1} {
+					dict set node_dict slowable 1
+				} else {
+					dict set node_dict slowable 0
+				}
 			}
 
 			dict set nodes_dict $node $node_dict
@@ -95,10 +104,10 @@ proc malc_brave {nodes_dict lambda} {
 			dict set fus_max_running_dict $fu 0
 		}
 
-		set has_allocated 0
+		set restarted 0
 		set t 0
 		# iterate until all nodes are scheduled
-		while {[llength $waiting_lst] + [llength $ready_lst] > 0 && $has_allocated == 0} {
+		while {[llength $waiting_lst] + [llength $ready_lst] > 0 && $restarted == 0} {
 			# update current time
 			incr t
 
@@ -240,7 +249,7 @@ proc malc_brave {nodes_dict lambda} {
 							# fus which are allocated
 							# later and can make use
 							# of them
-							set has_allocated 1
+							set restarted 1
 							break
 						}
 					}
