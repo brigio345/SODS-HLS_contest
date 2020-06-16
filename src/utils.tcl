@@ -70,28 +70,28 @@ proc get_sorted_nodes_by_t_alap {nodes_dict} {
 	return $nodes_sorted_dict
 }
 
-# get_sorted_selected_fus_dict:
+# get_sorted_selected_fus_arr:
 #	* argument(s):
 #		none.
 #	* return: 
-#		dictionary in which the key corresponds to operation
-#		and the value corresponds to list of a dictionary containing
+#		array in which the key corresponds to operation
+#		and the value corresponds to list of dictionaries containing
 #		the functional units implementing the key operation, sorted
-#		by attr, in ascending order, and the delta, corresponding to
-#		the difference between the value of attibute of the specific
-#		functional unit and the minimum value possible for that operation
+#		by delay, power and area, in ascending order, and the delta,
+#		corresponding to the difference between the delay of the specific
+#		functional unit and the minimum possible delay for that operation
 #		with the current library of functional units.
 #		N.B.1 only "convenient" fus are returned (fastest or which reduce
-#			power or area)
+#			power or area, without increasing power)
 #		N.B.2 only operations present in the current design are included.
-proc get_sorted_selected_fus_dict {} {
-	set fus_dict [dict create]
+proc get_sorted_selected_fus_arr {} {
+	array set fus_arr {}
 
 	foreach node [get_nodes] {
 		set op [get_attribute $node operation]
 
 		# avoid adding duplicates
-		if {[dict exists $fus_dict $op] == 0} {
+		if {[array get fus_arr $op] == ""} {
 			# label fus with their area, delay and power
 			# (needed for sorting)
 			set fu_specs_lst [list]
@@ -156,11 +156,11 @@ proc get_sorted_selected_fus_dict {} {
 				lappend sorted_op_fus_lst $op_fu_dict
 			}
 			
-			dict set fus_dict $op $sorted_op_fus_lst
+			set fus_arr($op) $sorted_op_fus_lst
 		}
 	}
 
-	return $fus_dict
+	return [array get fus_arr]
 }
 
 # get_total_area:

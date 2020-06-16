@@ -43,7 +43,7 @@ proc alap_sched {nodes_dict lambda} {
 #			2. fu: functional unit (chosen trying to minimize area
 #				and power consumption)
 proc malc_brave {nodes_dict lambda} {
-	set fus_dict [get_sorted_selected_fus_dict]
+	array set fus_arr [get_sorted_selected_fus_arr]
 
 	# do not allocate any fu at the beginnning
 	set fus_alloc_dict [dict create]
@@ -77,7 +77,7 @@ proc malc_brave {nodes_dict lambda} {
 			dict for {node node_dict} $nodes_dict {
 				set op [get_attribute $node operation]
 				# get fus implementing the operation of current node
-				set fus_lst [dict get $fus_dict $op]
+				set fus_lst $fus_arr($op)
 				set fu_index [dict get $node_dict fu_index]
 
 				if {$fu_index < [llength $fus_lst] - 1} {
@@ -167,7 +167,7 @@ proc malc_brave {nodes_dict lambda} {
 					incr fu_index
 					# get functional units implementing current node operation
 					set op [get_attribute $node operation]
-					set fus_lst [dict get $fus_dict $op]
+					set fus_lst $fus_arr($op)
 					# get dictionary of the new fu
 					set fu_dict [lindex $fus_lst $fu_index]
 					# check if the latency constraint would be still satisfied

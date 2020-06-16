@@ -19,13 +19,13 @@ proc brave_opt args {
 
 	puts $latency_value
 
-	set fus_dict [get_sorted_selected_fus_dict]
+	array set fus_arr [get_sorted_selected_fus_arr]
 	set nodes_dict [dict create]
 
 	# associate nodes to fastest resources
 	foreach node [get_nodes] {
 		set op [get_attribute $node operation]
-		set fu_dict [lindex [dict get $fus_dict $op] 0]
+		set fu_dict [lindex $fus_arr($op) 0]
 		set fu [dict get $fu_dict fu]
 		set node_dict [dict create fu_index 0]
 		dict set node_dict fu $fu
