@@ -70,6 +70,34 @@ proc get_sorted_nodes_by_t_alap {nodes_dict} {
 	return $nodes_sorted_dict
 }
 
+# update_sorted_nodes_by_t_alap:
+#	* argument(s):
+#		- node_mod: node whose t_alap has increased
+#		- nodes_dict: dictionary in which keys correspond to nodes and
+#			values correspond to information about the key node.
+#			N.B.1 this dictionary needs to be sorted, except for
+#				node_mod.
+#			N.B.2 t_alap of each node is required.
+#	* return: 
+#		nodes_dict sorted by t_alap in descending order.
+proc update_sorted_nodes_by_t_alap {mod_node nodes_dict} {
+	set mod_node_dict [dict get $nodes_dict $mod_node]
+	set t_alap [dict get $mod_node_dict t_alap]
+
+	set inserted 0
+	set nodes_sorted_dict [dict create]
+	dict for {node node_dict} $nodes_dict {
+		if {$inserted == 0 && [dict get $node_dict t_alap] >= $t_alap} {
+			dict set nodes_sorted_dict $mod_node $mod_node_dict
+			set inserted 1
+		}
+
+		dict set nodes_sorted_dict $node $node_dict
+	}
+
+	return $nodes_sorted_dict
+}
+
 # get_sorted_selected_fus_arr:
 #	* argument(s):
 #		none.

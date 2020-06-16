@@ -189,7 +189,7 @@ proc malc_brave {nodes_dict lambda} {
 
 						# after substituting a fu, t_alap
 						# are modified: need of sorting again
-						set nodes_dict [get_sorted_nodes_by_t_alap $nodes_dict]
+						set nodes_dict [update_sorted_nodes_by_t_alap $node $nodes_dict]
 
 						# update new slack
 						set slack [expr {$t_alap_slowed - $t}]
