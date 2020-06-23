@@ -33,17 +33,34 @@ proc alap_sched {nodes_dict lambda} {
 
 # malc_brave:
 #	* argument(s):
-#		- nodes_dict: dictionary in which keys correspond to nodes and
-#			values correspond to information about the key node.
-#			N.B.: fu of each node is required.
 #		- lambda: maximum total latency acceptable.
 #	* return: 
-#		nodes_dict with each node labeled with:
-#			1. t_sched: start time.
-#			2. fu: functional unit (chosen trying to minimize area
-#				and power consumption)
-proc malc_brave {nodes_dict lambda} {
+#		- start_time_lst: list of pairs <node_id, start_time>
+#		- fu_id_lst: list of pairs <node_id, fu_id>
+#		- fu_alloc_lst: list of pairs <fu_id, n_allocated>
+proc malc_brave {lambda} {
 	array set fus_arr [get_sorted_selected_fus_arr]
+	set nodes_dict [dict create]
+
+	# associate nodes to fastest resources
+	foreach node [get_nodes] {
+		set op [get_attribute $node operation]
+		set fu_dict [lindex $fus_arr($op) 0]
+		set fu [dict get $fu_dict fu]
+		set node_dict [dict create fu_index 0]
+		dict set node_dict fu $fu
+		dict set nodes_dict $node $node_dict
+	}
+
+	# label nodes with last possible start time (with fastest resources)
+	set nodes_dict [alap_sched $nodes_dict $lambda]
+
+	# check if scheduling is feasible
+	foreach node_dict [dict values $nodes_dict] {
+		if {[dict get $node_dict t_alap] <= 0} {
+			return -code error "No feasible scheduling with lambda=$lambda"
+		}
+	}
 
 	# do not allocate any fu at the beginnning
 	set fus_alloc_dict [dict create]
@@ -269,12 +286,18 @@ proc malc_brave {nodes_dict lambda} {
 		set fus_alloc_dict $fus_max_running_dict
 	}
 
-	# remove malc labels
+	set start_time_lst [list]
+	set fu_id_lst [list]
 	dict for {node node_dict} $nodes_dict {
-		set node_dict [dict remove $node_dict slowable]
-		dict set nodes_dict $node $node_dict
+		lappend start_time_lst "$node [dict get $node_dict t_sched]"
+		lappend fu_id_lst "$node [dict get $node_dict fu]"
 	}
 
-	return [dict create nodes $nodes_dict fus $fus_alloc_dict]
+	set fu_alloc_lst [list]
+	dict for {fu alloc} $fus_alloc_dict {
+		lappend fu_alloc_lst "$fu $alloc"
+	}
+
+	return [list $start_time_lst $fu_id_lst $fu_alloc_lst]
 }
 
