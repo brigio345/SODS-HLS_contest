@@ -75,11 +75,22 @@ proc malc_brave {lambda} {
 	# this may reduce the number of allocated resources, thus reducing area
 	set nodes_dict [get_sorted_nodes_by_t_alap $nodes_dict]
 
-	set has_slowed 1
-	set restarted 0
+	set sched_complete 1
+	set improvement 1
 	# repeat until a node has slowed or a fu has allocated
-	while {$has_slowed == 1 || $restarted == 1} {
-		set has_slowed 0
+	while {$sched_complete == 0 || $improvement == 1} {
+		# keep track if there has been improvement in this
+		# scheduling iteration (in which each node is slowed down
+		# at max once)
+		if {$sched_complete == 1} {
+			# initialize improvement flag when starting a
+			# new scheduling iteration
+			set improvement 0
+		} elseif {$has_slowed == 1} {
+			# if a node has been slowed down
+			# there had been an improvement
+			set improvement 1
+		}
 
 		# initialization
 
@@ -91,7 +102,7 @@ proc malc_brave {lambda} {
 		# or when the first iteration is being executed:
 		# this is to avoid slowing down only first nodes in
 		# topological order
-		if {$restarted == 0} {
+		if {$sched_complete == 1} {
 			dict for {node node_dict} $nodes_dict {
 				set op [get_attribute $node operation]
 				# get fus implementing the operation of
@@ -128,11 +139,13 @@ proc malc_brave {lambda} {
 		# setup variables to force entering the while loop
 		set waiting_cnt 1
 		set ready_cnt 0
-		set restarted 0
+		set sched_complete 1
 		# initialize time
 		set t 0
+
+		set has_slowed 0
 		# iterate until all nodes are scheduled
-		while {$waiting_cnt + $ready_cnt > 0 && $restarted == 0} {
+		while {$waiting_cnt + $ready_cnt > 0 && $sched_complete == 1} {
 			# update current time
 			incr t
 
@@ -233,6 +246,12 @@ proc malc_brave {lambda} {
 
 						# update new slack
 						set slack [expr {$t_alap_slowed - $t}]
+
+						dict set node_dict slowable 0
+						dict set nodes_dict $node $node_dict
+						set sched_complete 0
+
+						break
 					}
 
 					# avoid trying to replace this node in
@@ -294,7 +313,7 @@ proc malc_brave {lambda} {
 							# fus which are allocated
 							# later and can make use
 							# of them
-							set restarted 1
+							set sched_complete 0
 							break
 						}
 					}
