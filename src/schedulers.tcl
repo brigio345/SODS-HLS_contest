@@ -77,6 +77,7 @@ proc malc_brave {lambda} {
 
 	set sched_complete 1
 	set improvement 1
+	set has_slowed 0
 	# repeat until a node has slowed or a fu has allocated
 	while {$sched_complete == 0 || $improvement == 1} {
 		# keep track if there has been improvement in this
