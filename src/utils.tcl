@@ -178,7 +178,7 @@ proc get_sorted_selected_fus_arr {} {
 				}
 
 				set fu [lindex $fu_specs 0]
-				set delta [expr $delay - $min_delay]
+				set delta [expr {$delay - $min_delay}]
 
 				set op_fu_dict [dict create fu $fu delta $delta]
 				lappend sorted_op_fus_lst $op_fu_dict
