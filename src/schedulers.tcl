@@ -109,10 +109,15 @@ proc malc_brave {lambda} {
 		}
 
 		# set all nodes as "waiting"
-		set waiting_lst [dict keys $nodes_dict]
 		# set no node as "ready" or "running"
-		set ready_lst [list]
-		set running_lst [list]
+		array set waiting_arr {}
+		array set ready_arr {}
+		array set running_arr {}
+		foreach node [dict keys $nodes_dict] {
+			set waiting_arr($node) 1
+			set ready_arr($node) 0
+			set running_arr($node) 0
+		}
 
 		# set all fus as not "running"
 		foreach fu [get_lib_fus] {
@@ -120,50 +125,70 @@ proc malc_brave {lambda} {
 			set fus_max_running_arr($fu) 0
 		}
 
+		# setup variables to force entering the while loop
+		set waiting_cnt 1
+		set ready_cnt 0
 		set restarted 0
+		# initialize time
 		set t 0
 		# iterate until all nodes are scheduled
-		while {[llength $waiting_lst] + [llength $ready_lst] > 0 && $restarted == 0} {
+		while {$waiting_cnt + $ready_cnt > 0 && $restarted == 0} {
 			# update current time
 			incr t
 
+			# initialize counters (needed for controlling the main loop)
+			set waiting_cnt 0
+			set ready_cnt 0
 			# update ready list
-			foreach node $waiting_lst {
+			foreach node [dict keys $nodes_dict] {
+				if {$waiting_arr($node) == 0} {
+					continue
+				}
 				set ready 1
 
 				# check if all parents are scheduled
 				# (not present in ready or waiting lists)
 				foreach parent [get_attribute $node parents] {
-					if {[lsearch $waiting_lst $parent] != -1 ||
-							[lsearch $ready_lst $parent] != -1} {
+					if {$waiting_arr($parent) == 1 ||
+							$ready_arr($parent) == 1} {
 						set ready 0
 						break
 					}
 				}
 
 				if {$ready == 1} {
-					lappend ready_lst $node
-					lremove waiting_lst $node
+					set ready_arr($node) 1
+					set waiting_arr($node) 0
+				} else {
+					# update waiting count (ready nodes
+					# will be counted later)
+					incr waiting_cnt
 				}
 			}
 
 			# check what nodes has completed at time t
 			# and update fus_running_arr accordingly
-			foreach node $running_lst {
-				set node_dict [dict get $nodes_dict $node]
+			dict for {node node_dict} $nodes_dict {
+				if {$running_arr($node) == 0} {
+					continue
+				}
 
 				set t_sched [dict get $node_dict t_sched]
 				set fu [dict get $node_dict fu]
 				set delay [get_attribute $fu delay]
 
 				if {$t >= $t_sched + $delay} {
-					lremove running_lst $node
+					set running_arr($node) 0
 					incr fus_running_arr($fu) -1
 				}
 			}
 
-			foreach node $ready_lst {
-				set node_dict [dict get $nodes_dict $node]
+			dict for {node node_dict} $nodes_dict {
+				if {$ready_arr($node) == 0} {
+					continue
+				}
+				# count how many nodes are ready
+				incr ready_cnt
 
 				set t_alap [dict get $node_dict t_alap]
 				set slack [expr {$t_alap - $t}]
@@ -235,12 +260,15 @@ proc malc_brave {lambda} {
 				# schedule node with no more positive slack or
 				# which do not require additional fu
 				if {$slack == 0 || $running < $alloc} {
+					# decrease ready counter: a scheduled
+					# node is no more ready
+					incr ready_cnt -1
 					# annotate scheduled node with t_sched
 					dict set node_dict t_sched $t
 					dict set nodes_dict $node $node_dict
-					# remove scheduled node from ready_lst
-					lremove ready_lst $node
-					lappend running_lst $node
+					# remove scheduled node from ready_arr
+					set ready_arr($node) 0
+					set running_arr($node) 1
 
 					# update fus count
 					incr running
