@@ -40,6 +40,8 @@ proc alap_sched {nodes_dict lambda} {
 #		- fu_alloc_lst: list of pairs <fu_id, n_allocated>
 proc malc_brave {lambda} {
 	array set fus_arr [get_sorted_selected_fus_arr]
+	array set fus_running_arr {}
+	array set fus_max_running_arr {}
 	set nodes_dict [dict create]
 
 	# associate nodes to fastest resources
@@ -63,9 +65,9 @@ proc malc_brave {lambda} {
 	}
 
 	# do not allocate any fu at the beginnning
-	set fus_alloc_dict [dict create]
+	array set fus_alloc_arr {}
 	foreach fu [get_lib_fus] {
-		dict set fus_alloc_dict $fu 0
+		set fus_alloc_arr($fu) 0
 	}
 
 	# sorting nodes by t_alap forces to schedule first most critical nodes,
@@ -113,11 +115,9 @@ proc malc_brave {lambda} {
 		set running_lst [list]
 
 		# set all fus as not "running"
-		set fus_running_dict [dict create]
-		set fus_max_running_dict [dict create]
 		foreach fu [get_lib_fus] {
-			dict set fus_running_dict $fu 0
-			dict set fus_max_running_dict $fu 0
+			set fus_running_arr($fu) 0
+			set fus_max_running_arr($fu) 0
 		}
 
 		set restarted 0
@@ -148,7 +148,7 @@ proc malc_brave {lambda} {
 			}
 
 			# check what nodes has completed at time t
-			# and update fus_running_dict accordingly
+			# and update fus_running_arr accordingly
 			foreach node $running_lst {
 				set node_dict [dict get $nodes_dict $node]
 
@@ -158,9 +158,7 @@ proc malc_brave {lambda} {
 
 				if {$t >= $t_sched + $delay} {
 					lremove running_lst $node
-					set running [dict get $fus_running_dict $fu]
-					incr running -1
-					dict set fus_running_dict $fu $running
+					incr fus_running_arr($fu) -1
 				}
 			}
 
@@ -232,8 +230,8 @@ proc malc_brave {lambda} {
 
 				set fu [dict get $node_dict fu]
 
-				set running [dict get $fus_running_dict $fu]
-				set alloc [dict get $fus_alloc_dict $fu]
+				set running $fus_running_arr($fu)
+				set alloc $fus_alloc_arr($fu)
 				# schedule node with no more positive slack or
 				# which do not require additional fu
 				if {$slack == 0 || $running < $alloc} {
@@ -246,15 +244,14 @@ proc malc_brave {lambda} {
 
 					# update fus count
 					incr running
-					dict set fus_running_dict $fu $running
+					set fus_running_arr($fu) $running
 					
 					# store the maximum number of contemporary
 					# running fus of each type (to know what
 					# are actually  used in this scheduling
 					# iteration)
-					set max_running [dict get $fus_max_running_dict $fu]
-					if {$running > $max_running} {
-						dict set fus_max_running_dict $fu $running
+					if {$running > $fus_max_running_arr($fu)} {
+						set fus_max_running_arr($fu) $running
 
 						# when running > alloc it is
 						# necessary to allocate a new fu
@@ -263,7 +260,7 @@ proc malc_brave {lambda} {
 							# every time a fu is added
 							# N.B. all data structures
 							# are re-initialized,
-							# except for fus_alloc_dict,
+							# except for fus_alloc_arr,
 							# so that previous scheduling
 							# steps will be aware of
 							# fus which are allocated
@@ -278,12 +275,12 @@ proc malc_brave {lambda} {
 			}
 		}
 
-		# Update fus_alloc_dict with actually used fus:
+		# Update fus_alloc_arr with actually used fus:
 		# - it is necessary to allocate a number of fus equal to the
 		# maximum number of contemporary running fus of each type
 		# - it is possible that some fus allocated in previous scheduling
 		# iteration are no more needed
-		set fus_alloc_dict $fus_max_running_dict
+		array set fus_alloc_arr [array get fus_max_running_arr]
 	}
 
 	set start_time_lst [list]
@@ -294,7 +291,7 @@ proc malc_brave {lambda} {
 	}
 
 	set fu_alloc_lst [list]
-	dict for {fu alloc} $fus_alloc_dict {
+	foreach {fu alloc} [array get fus_alloc_arr] {
 		lappend fu_alloc_lst "$fu $alloc"
 	}
 
