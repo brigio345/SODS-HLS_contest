@@ -14,88 +14,89 @@ proc lremove {list_variable value} {
 
 # get_reverse_sorted_nodes:
 #	* argument(s):
-#		- nodes_dict: dictionary in which keys correspond to nodes and
-#			values correspond to information about the key node.
+#		none.
 #	* return: 
-#		nodes_dict in topological reverse order.
-proc get_reverse_sorted_nodes {nodes_dict} {
-	set sorted_dict [dict create]
+#		list of all nodes in topological reverse order.
+proc get_reverse_sorted_nodes {} {
+	set sorted_lst [list]
+	array set unsorted_arr {}
+	foreach node [get_nodes] {
+		set unsorted_arr($node) 1
+	}
 
-	set unsorted_lst [dict keys $nodes_dict]
-
-	while {[llength $unsorted_lst] > 0} {
-		foreach node $unsorted_lst {
+	set all_sorted 0
+	while {$all_sorted == 0} {
+		set all_sorted 1
+		foreach {node unsorted} [array get unsorted_arr] {
+			if {$unsorted == 0} {
+				continue
+			}
+			
 			set all_child_sorted 1
 			foreach child [get_attribute $node children] {
 				# if current node has a child not sorted yet,
 				# it cannot be added to sorted list
-				if {[lsearch $unsorted_lst $child] != -1} {
+				if {$unsorted_arr($child) == 1} {
 					set all_child_sorted 0
 					break
 				}
 			}
 			if {$all_child_sorted == 1} {
-				lremove unsorted_lst $node
-				dict set sorted_dict $node [dict get $nodes_dict $node]
+				set unsorted_arr($node) 0
+				lappend sorted_lst $node
+			} else {
+				set all_sorted 0
 			}
 		}
 	}
 
-	return $sorted_dict
+	return $sorted_lst
 }
 
 # get_sorted_nodes_by_t_alap:
 #	* argument(s):
-#		- nodes_dict: dictionary in which keys correspond to nodes and
-#			values correspond to information about the key node.
-#			N.B. t_alap of each node is required
+#		- t_alap_arr_arg: array in which index is node and value is
+#			its t_alap
 #	* return: 
-#		nodes_dict sorted by t_alap in descending order.
-proc get_sorted_nodes_by_t_alap {nodes_dict} {
-	set nodes_t_alap_lst [list]
-	dict for {node node_dict} $nodes_dict {
-		set t_alap [dict get $node_dict t_alap]
-		lappend nodes_t_alap_lst [list $node $t_alap]
+#		list of nodes sorted by t_alap in descending order.
+proc get_sorted_nodes_by_t_alap {t_alap_arr_arg} {
+	array set t_alap_arr $t_alap_arr_arg
+	set t_alap_lst [list]
+	foreach {node t_alap} [array get t_alap_arr] {
+		lappend t_alap_lst [list $node $t_alap]
 	}
 
-	set nodes_t_alap_lst [lsort -index 1 -integer $nodes_t_alap_lst]
+	set sorted_t_alap_lst [lsort -index 1 -integer $t_alap_lst]
 
-	set nodes_sorted_dict [dict create]
-	foreach node_t_alap_pair $nodes_t_alap_lst {
-		set node [lindex $node_t_alap_pair 0]
-		set node_dict [dict get $nodes_dict $node]
-		dict set nodes_sorted_dict $node $node_dict
+	set sorted_nodes_lst [list]
+	foreach node_t_alap $sorted_t_alap_lst {
+		lappend sorted_nodes_lst [lindex $node_t_alap 0]
 	}
 
-	return $nodes_sorted_dict
+	return $sorted_nodes_lst
 }
 
 # update_sorted_nodes_by_t_alap:
 #	* argument(s):
-#		- node_mod: node whose t_alap has increased
-#		- nodes_dict: dictionary in which keys correspond to nodes and
-#			values correspond to information about the key node.
-#			N.B.1 this dictionary needs to be sorted, except for
-#				node_mod.
-#			N.B.2 t_alap of each node is required.
+#		- mod_node: node whose t_alap has changed
+#		- sorted_nodes_lst: list of nodes sorted by t_alap in descending
+#			order (except for mod_node, which may be out of order).
+#		- t_alap_arr_arg: array in which index is node and value is
+#			its t_alap
 #	* return: 
-#		nodes_dict sorted by t_alap in descending order.
-proc update_sorted_nodes_by_t_alap {mod_node nodes_dict} {
-	set mod_node_dict [dict get $nodes_dict $mod_node]
-	set t_alap [dict get $mod_node_dict t_alap]
+#		list of nodes sorted by t_alap in descending order.
+proc update_sorted_nodes_by_t_alap {mod_node sorted_nodes_lst t_alap_arr_arg} {
+	array set t_alap_arr $t_alap_arr_arg
+	set t_alap $t_alap_arr($mod_node)
 
-	set inserted 0
-	set nodes_sorted_dict [dict create]
-	dict for {node node_dict} $nodes_dict {
-		if {$inserted == 0 && [dict get $node_dict t_alap] >= $t_alap} {
-			dict set nodes_sorted_dict $mod_node $mod_node_dict
-			set inserted 1
-		}
+	lremove sorted_nodes_lst $mod_node
 
-		dict set nodes_sorted_dict $node $node_dict
+	set i 0
+	while {$t_alap > $t_alap_arr([lindex $sorted_nodes_lst $i])} {
+		incr i
 	}
 
-	return $nodes_sorted_dict
+	return [concat [lrange $sorted_nodes_lst 0 $i-1] $mod_node [lrange $sorted_nodes_lst $i end]]
 }
 
 # get_sorted_selected_fus_arr:
@@ -215,7 +216,6 @@ proc get_total_area {fus_alloc_lst} {
 #	* return: 
 #		total consumed power
 proc get_total_power {nodes_fu_lst} {
-	# TODO: check what lambda means in the provided formula
 	set total_power 0
 	foreach node_fu_lst $nodes_fu_lst {
 		set node [lindex $node_fu_lst 0]
