@@ -187,11 +187,10 @@ proc malc_brave {lambda} {
 					continue
 				}
 
-				set t_sched [dict get $node_dict t_sched]
+				set t_end [dict get $node_dict t_end]
 				set fu [dict get $node_dict fu]
-				set delay [get_attribute $fu delay]
 
-				if {$t >= $t_sched + $delay} {
+				if {$t >= $t_end} {
 					set running_arr($node) 0
 					incr fus_running_arr($fu) -1
 				}
@@ -284,7 +283,12 @@ proc malc_brave {lambda} {
 					# node is no more ready
 					incr ready_cnt -1
 					# annotate scheduled node with t_sched
+					# and t_end
 					dict set node_dict t_sched $t
+
+					set delay [get_attribute $fu delay]
+					dict set node_dict t_end [expr {$t + $delay}]
+
 					dict set nodes_dict $node $node_dict
 					# remove scheduled node from ready_arr
 					set ready_arr($node) 0
