@@ -13,18 +13,19 @@ proc alap_sched {nodes_dict lambda} {
 	# iterate all nodes, in a reverse topological order
 	# (so that it is always considered a node with all descendant scheduled)
 	dict for {node node_dict} [get_reverse_sorted_nodes $nodes_dict] {
-		set node_delay [get_attribute [dict get $node_dict fu] delay]
-		set t_alap [expr {$lambda - $node_delay}]
+		set t_alap_child_min $lambda
 		foreach child [get_attribute $node children] {
 			set child_dict [dict get $nodes_dict $child]
 			set t_alap_child [dict get $child_dict t_alap]
-			set t_alap_new [expr {$t_alap_child - $node_delay}]
-			if {$t_alap_new < $t_alap} {
-				set t_alap $t_alap_new
+			if {$t_alap_child < $t_alap_child_min} {
+				set t_alap_child_min $t_alap_child
 			}
 		}
 
+		set node_delay [get_attribute [dict get $node_dict fu] delay]
+		set t_alap [expr {$t_alap_child_min - $node_delay}]
 		dict set node_dict t_alap $t_alap
+
 		dict set nodes_dict $node $node_dict
 	}
 
@@ -39,6 +40,12 @@ proc alap_sched {nodes_dict lambda} {
 #		- fu_id_lst: list of pairs <node_id, fu_id>
 #		- fu_alloc_lst: list of pairs <fu_id, n_allocated>
 proc malc_brave {lambda} {
+	# define "constants"
+	set WAITING 	0
+	set READY 	1
+	set RUNNING 	2
+	set COMPLETE 	3
+
 	array set fus_arr [get_sorted_selected_fus_arr]
 	array set fus_running_arr {}
 	array set fus_max_running_arr {}
@@ -73,7 +80,7 @@ proc malc_brave {lambda} {
 	# sorting nodes by t_alap forces to schedule first most critical nodes,
 	# not only when their slack is 0, but also on "free" resources:
 	# this may reduce the number of allocated resources, thus reducing area
-	set nodes_dict [get_sorted_nodes_by_t_alap $nodes_dict]
+	set nodes_dict [sort_nodes_by_t_alap $nodes_dict]
 
 	set sched_complete 1
 	set improvement 1
@@ -121,14 +128,12 @@ proc malc_brave {lambda} {
 		}
 
 		# set all nodes as "waiting"
-		# set no node as "ready" or "running"
-		array set waiting_arr {}
-		array set ready_arr {}
-		array set running_arr {}
-		foreach node [dict keys $nodes_dict] {
-			set waiting_arr($node) 1
-			set ready_arr($node) 0
-			set running_arr($node) 0
+		# set no node as "ready" or "running" or "complete"
+		array set complete_arr {}
+		dict for {node node_dict} $nodes_dict {
+			dict set node_dict status $WAITING
+			dict set nodes_dict $node $node_dict
+			set complete_arr($node) 0
 		}
 
 		# set all fus as not "running"
@@ -153,26 +158,40 @@ proc malc_brave {lambda} {
 			# initialize counters (needed for controlling the main loop)
 			set waiting_cnt 0
 			set ready_cnt 0
-			# update ready list
-			foreach node [dict keys $nodes_dict] {
-				if {$waiting_arr($node) == 0} {
+
+			# check what nodes has completed at time t
+			# and update fus_running_arr accordingly
+			dict for {node node_dict} $nodes_dict {
+				if {[dict get $node_dict status] != $RUNNING} {
 					continue
 				}
-				set ready 1
 
-				# check if all parents are scheduled
-				# (not present in ready or waiting lists)
+				if {$t >= [dict get $node_dict t_end]} {
+					dict set node_dict status $COMPLETE
+					dict set nodes_dict $node $node_dict
+					set complete_arr($node) 1
+					incr fus_running_arr([dict get $node_dict fu]) -1
+				}
+			}
+
+			# update ready list
+			dict for {node node_dict} $nodes_dict {
+				if {[dict get $node_dict status] != $WAITING} {
+					continue
+				}
+
+				set ready 1
+				# check if all parents are completed
 				foreach parent [get_attribute $node parents] {
-					if {$waiting_arr($parent) == 1 ||
-							$ready_arr($parent) == 1} {
+					if {$complete_arr($parent) == 0} {
 						set ready 0
 						break
 					}
 				}
 
 				if {$ready == 1} {
-					set ready_arr($node) 1
-					set waiting_arr($node) 0
+					dict set node_dict status $READY
+					dict set nodes_dict $node $node_dict
 				} else {
 					# update waiting count (ready nodes
 					# will be counted later)
@@ -180,24 +199,8 @@ proc malc_brave {lambda} {
 				}
 			}
 
-			# check what nodes has completed at time t
-			# and update fus_running_arr accordingly
 			dict for {node node_dict} $nodes_dict {
-				if {$running_arr($node) == 0} {
-					continue
-				}
-
-				set t_end [dict get $node_dict t_end]
-				set fu [dict get $node_dict fu]
-
-				if {$t >= $t_end} {
-					set running_arr($node) 0
-					incr fus_running_arr($fu) -1
-				}
-			}
-
-			dict for {node node_dict} $nodes_dict {
-				if {$ready_arr($node) == 0} {
+				if {[dict get $node_dict status] != $READY} {
 					continue
 				}
 				# count how many nodes are ready
@@ -234,21 +237,23 @@ proc malc_brave {lambda} {
 					if {$t_alap_slowed >= $t} {
 						# update the flag
 						set has_slowed 1
+
 						# update t_alap with new resource
 						dict set node_dict t_alap $t_alap_slowed
-
 						dict set node_dict fu_index $fu_index
 						dict set node_dict fu [dict get $fu_dict fu]
+						dict set node_dict slowable 0
+
+						dict set nodes_dict $node $node_dict
+
+						foreach parent [get_attribute $node parents] {
+							set nodes_dict [update_t_alap $parent $node $nodes_dict]
+						}
 
 						# after substituting a fu, t_alap
 						# are modified: need of sorting again
-						set nodes_dict [update_sorted_nodes_by_t_alap $node $nodes_dict]
+						set nodes_dict [sort_nodes_by_t_alap $nodes_dict]
 
-						# update new slack
-						set slack [expr {$t_alap_slowed - $t}]
-
-						dict set node_dict slowable 0
-						dict set nodes_dict $node $node_dict
 						set sched_complete 0
 
 						break
@@ -276,6 +281,7 @@ proc malc_brave {lambda} {
 
 				set running $fus_running_arr($fu)
 				set alloc $fus_alloc_arr($fu)
+
 				# schedule node with no more positive slack or
 				# which do not require additional fu
 				if {$slack == 0 || $running < $alloc} {
@@ -289,10 +295,9 @@ proc malc_brave {lambda} {
 					set delay [get_attribute $fu delay]
 					dict set node_dict t_end [expr {$t + $delay}]
 
+					dict set node_dict status $RUNNING
+
 					dict set nodes_dict $node $node_dict
-					# remove scheduled node from ready_arr
-					set ready_arr($node) 0
-					set running_arr($node) 1
 
 					# update fus count
 					incr running
@@ -322,7 +327,6 @@ proc malc_brave {lambda} {
 							break
 						}
 					}
-
 				}
 			}
 		}
