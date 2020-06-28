@@ -25,12 +25,20 @@ proc test_suite {} {
 		set end_time [clock clicks -milliseconds]
 
 
-		set start_time_lst [lindex $res 0]
-		set fu_id_lst [lindex $res 1]
+		set node_start_lst [lindex $res 0]
+		set node_fu_lst [lindex $res 1]
 		set fu_alloc_lst [lindex $res 2]
 
+		puts -nonewline "Testing occurrencies..."
+		if {[test_occurrencies $node_start_lst $node_fu_lst $fu_alloc_lst] == 1} {
+			puts "\t\t\tOK"
+		} else {
+			puts "\t\t\tFAIL"
+			set success 0
+		}
+
 		puts -nonewline "Testing latency violations..."
-		if {[test_latency $start_time_lst $fu_id_lst $lambda] == 1} {
+		if {[test_latency $node_start_lst $node_fu_lst $lambda] == 1} {
 			puts "\t\tOK"
 		} else {
 			puts "\t\tFAIL"
@@ -38,7 +46,7 @@ proc test_suite {} {
 		}
 
 		puts -nonewline "Testing dependecies violations..."
-		if {[test_dependencies $start_time_lst $fu_id_lst] == 1} {
+		if {[test_dependencies $node_start_lst $node_fu_lst] == 1} {
 			puts "\tOK"
 		} else {
 			puts "\tFAIL"
@@ -46,7 +54,7 @@ proc test_suite {} {
 		}
 
 		puts -nonewline "Testing fus conflicts..."
-		if {[test_fu_conflicts $start_time_lst $fu_id_lst $fu_alloc_lst] == 1} {
+		if {[test_fu_conflicts $node_start_lst $node_fu_lst $fu_alloc_lst] == 1} {
 			puts "\t\tOK"
 		} else {
 			puts "\t\tFAIL"
@@ -67,27 +75,62 @@ proc test_suite {} {
 	return $success
 }
 
+# test_occurrencies:
+#	* argument(s):
+#		- node_start_lst: list of pairs <node_id, start_time>
+#		- node_fu_lst: list of pairs <node_id, fu_id>
+#		- fu_alloc_lst: list of pairs <fu_id, n_allocated>
+#	* return: 
+#		1 if each node appears exactly once in node_start_lst and
+#		node_fu_lst and each fu appears exactly once in fu_alloc_lst,
+#		0 otherwise.
+proc test_occurrencies {node_start_lst node_fu_lst fu_alloc_lst} {
+	foreach node [get_nodes] {
+		set node_start_pair_lst [lsearch -all -inline -index 0 $node_start_lst $node]
+		
+		if {[llength $node_start_pair_lst] != 1} {
+			return 0
+		}
+
+		set node_fu_pair_lst [lsearch -all -inline -index 0 $node_fu_lst $node]
+		
+		if {[llength $node_fu_pair_lst] != 1} {
+			return 0
+		}
+	}
+
+	foreach fu [get_lib_fus] {
+		set node_fu_pair_lst [lsearch -all -inline -index 0 $fu_alloc_lst $fu]
+
+		if {[llength $node_fu_pair_lst] != 1} {
+			return 0
+		}
+	}
+
+	return 1
+}
+
 # test_latency:
 #	* argument(s):
-#		- start_time_lst: list of pairs <node_id, start_time>
-#		- fu_id_lst: list of pairs <node_id, fu_id>
+#		- node_start_lst: list of pairs <node_id, start_time>
+#		- node_fu_lst: list of pairs <node_id, fu_id>
 #		- lambda: latency constraint.
 #	* return: 
 #		1 if latency constraint is satisfied, 0 otherwise.
-proc test_latency {start_time_lst fu_id_lst lambda} {
+proc test_latency {node_start_lst node_fu_lst lambda} {
 	foreach node [get_nodes] {
 		# check end time of leaves only
 		if {[get_attribute $node n_children] == 0} {
-			set start_time_i [lsearch -index 0 $start_time_lst $node]
-			set start_time_pair [lindex $start_time_lst $start_time_i]
-			set start_time [lindex $start_time_pair 1]
-			set fu_id_i [lsearch -index 0 $fu_id_lst $node]
-			set fu [lindex [lindex $fu_id_lst $fu_id_i] 1]
+			set node_start_pair [lsearch -inline -index 0 $node_start_lst $node]
+			set start [lindex $node_start_pair 1]
 
+			set node_fu_pair [lsearch -inline -index 0 $node_fu_lst $node]
+			set fu [lindex $node_fu_pair 1]
 			set delay [get_attribute $fu delay]
-			set end_time [expr {$start_time + $delay}]
+
+			set end [expr {$start + $delay}]
 			
-			if {$end_time > $lambda} {
+			if {$end > $lambda} {
 				return 0
 			}
 		}
@@ -98,23 +141,25 @@ proc test_latency {start_time_lst fu_id_lst lambda} {
 
 # test_dependencies:
 #	* argument(s):
-#		- start_time_lst: list of pairs <node_id, start_time>
-#		- fu_id_lst: list of pairs <node_id, fu_id>
+#		- node_start_lst: list of pairs <node_id, start_time>
+#		- node_fu_lst: list of pairs <node_id, fu_id>
 #	* return: 
-#		1 if DFG dependencies are satisfied by inputs, 0 otherwise.
-proc test_dependencies {start_time_lst fu_id_lst} {
+#		1 if DFG dependencies are satisfied, 0 otherwise.
+proc test_dependencies {node_start_lst node_fu_lst} {
 	foreach node [get_nodes] {
-		set node_pair [lsearch -inline -index 0 $start_time_lst $node]
-		set node_start [lindex $node_pair 1]
-		set node_fu_pair [lsearch -inline -index 0 $fu_id_lst $node]
+		set node_start_pair [lsearch -inline -index 0 $node_start_lst $node]
+		set start [lindex $node_start_pair 1]
+
+		set node_fu_pair [lsearch -inline -index 0 $node_fu_lst $node]
 		set fu [lindex $node_fu_pair 1]
-		set node_delay [get_attribute $fu delay]
-		set node_end [expr {$node_start + $node_delay}]
+		set delay [get_attribute $fu delay]
+		set end [expr {$start + $delay}]
+
 		foreach child [get_attribute $node children] {
-			set child_start_pair [lsearch -inline -index 0 $start_time_lst $child]
+			set child_start_pair [lsearch -inline -index 0 $node_start_lst $child]
 			set child_start [lindex $child_start_pair 1]
 
-			if {$child_start < $node_end} {
+			if {$child_start < $end} {
 				return 0
 			}
 		}
@@ -125,27 +170,19 @@ proc test_dependencies {start_time_lst fu_id_lst} {
 
 # test_fu_conflicts:
 #	* argument(s):
-#		- start_time_lst: list of pairs <node_id, start_time>
-#		- fu_id_lst: list of pairs <node_id, fu_id>
+#		- node_start_lst: list of pairs <node_id, start_time>
+#		- node_fu_lst: list of pairs <node_id, fu_id>
 #		- fu_alloc_lst: list of pairs <fu_id, n_allocated>
 #	* return: 
 #		1 if the number of maximum contemporaneously running fus of each
 #		type is equal to n_allocated, 0 otherwise.
-proc test_fu_conflicts {start_time_lst fu_id_lst fu_alloc_lst} {
+proc test_fu_conflicts {node_start_lst node_fu_lst fu_alloc_lst} {
 	foreach fu [get_lib_fus] {
 		set start_lst [list]
 
-		foreach fu_id_pair [lsearch -all -inline -index 1 $fu_id_lst $fu] {
-			set node [lindex $fu_id_pair 0]
-			set node_start_pair_lst [lsearch -all -inline -index 0 $start_time_lst $node]
-
-			# check if a node has been scheduled more than once
-			# or is hasn't been scheduled
-			if {[llength $node_start_pair_lst] != 1} {
-				return 0
-			}
-
-			set node_start_pair [lindex $node_start_pair_lst 0]
+		foreach node_fu_pair [lsearch -all -inline -index 1 $node_fu_lst $fu] {
+			set node [lindex $node_fu_pair 0]
+			set node_start_pair [lsearch -inline -index 0 $node_start_lst $node]
 			lappend start_lst [lindex $node_start_pair 1]
 		}
 
@@ -172,15 +209,7 @@ proc test_fu_conflicts {start_time_lst fu_id_lst fu_alloc_lst} {
 			}
 		}
 
-		set fu_alloc_pair_lst [lsearch -all -inline -index 0 $fu_alloc_lst $fu]
-
-		# check if the fu has appears more than once or it does not appear
-		if {[llength $fu_alloc_pair_lst] != 1} {
-			return 0
-		}
-
-		set fu_alloc_pair [lindex $fu_alloc_pair_lst 0]
-
+		set fu_alloc_pair [lsearch -inline -index 0 $fu_alloc_lst $fu]
 		set alloc [lindex $fu_alloc_pair 1]
 
 		if {$running_max != $alloc} {

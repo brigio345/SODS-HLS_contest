@@ -339,11 +339,11 @@ proc malc_brave {lambda} {
 		array set fus_alloc_arr [array get fus_max_running_arr]
 	}
 
-	set start_time_lst [list]
-	set fu_id_lst [list]
+	set node_start_lst [list]
+	set node_fu_lst [list]
 	dict for {node node_dict} $nodes_dict {
-		lappend start_time_lst "$node [dict get $node_dict t_sched]"
-		lappend fu_id_lst "$node [dict get $node_dict fu]"
+		lappend node_start_lst "$node [dict get $node_dict t_sched]"
+		lappend node_fu_lst "$node [dict get $node_dict fu]"
 	}
 
 	set fu_alloc_lst [list]
@@ -351,6 +351,6 @@ proc malc_brave {lambda} {
 		lappend fu_alloc_lst "$fu $alloc"
 	}
 
-	return [list $start_time_lst $fu_id_lst $fu_alloc_lst]
+	return [list $node_start_lst $node_fu_lst $fu_alloc_lst]
 }
 
