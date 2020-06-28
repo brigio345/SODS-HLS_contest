@@ -111,6 +111,7 @@ proc malc_brave {lambda} {
 		# this is to avoid slowing down only first nodes in
 		# topological order
 		if {$sched_complete == 1} {
+			set slowable_lst [list]
 			dict for {node node_dict} $nodes_dict {
 				set op [get_attribute $node operation]
 				# get fus implementing the operation of
@@ -118,12 +119,8 @@ proc malc_brave {lambda} {
 				set fu_index [dict get $node_dict fu_index]
 
 				if {$fu_index < [llength $fus_arr($op)] - 1} {
-					dict set node_dict slowable 1
-				} else {
-					dict set node_dict slowable 0
+					lappend slowable_lst $node
 				}
-
-				dict set nodes_dict $node $node_dict
 			}
 		}
 
@@ -199,12 +196,12 @@ proc malc_brave {lambda} {
 				}
 			}
 
-			dict for {node node_dict} $nodes_dict {
+			foreach node $slowable_lst {
+				set node_dict [dict get $nodes_dict $node]
+
 				if {[dict get $node_dict status] != $READY} {
 					continue
 				}
-				# count how many nodes are ready
-				incr ready_cnt
 
 				set t_alap [dict get $node_dict t_alap]
 				set slack [expr {$t_alap - $t}]
@@ -215,7 +212,7 @@ proc malc_brave {lambda} {
 				# constraint.
 				# Proceed only if node hasn't already been
 				# slowed down in this iteration.
-				if {$slack > 0 && [dict get $node_dict slowable] == 1} {
+				if {$slack > 0} {
 					# get current fu index
 					set fu_index [dict get $node_dict fu_index]
 					# move to the next slower fu
@@ -242,7 +239,7 @@ proc malc_brave {lambda} {
 						dict set node_dict t_alap $t_alap_slowed
 						dict set node_dict fu_index $fu_index
 						dict set node_dict fu [dict get $fu_dict fu]
-						dict set node_dict slowable 0
+						lremove slowable_lst $node
 
 						dict set nodes_dict $node $node_dict
 
@@ -272,11 +269,19 @@ proc malc_brave {lambda} {
 					#		it can be replaced in
 					#		next iterations, since
 					#		the slack will decrease
-					dict set node_dict slowable 0
+					lremove slowable_lst $node
 
 					dict set nodes_dict $node $node_dict
 				}
+			}
 
+			dict for {node node_dict} $nodes_dict {
+				if {[dict get $node_dict status] != $READY} {
+					continue
+				}
+
+				set t_alap [dict get $node_dict t_alap]
+				set slack [expr {$t_alap - $t}]
 				set fu [dict get $node_dict fu]
 
 				set running $fus_running_arr($fu)
@@ -285,9 +290,6 @@ proc malc_brave {lambda} {
 				# schedule node with no more positive slack or
 				# which do not require additional fu
 				if {$slack == 0 || $running < $alloc} {
-					# decrease ready counter: a scheduled
-					# node is no more ready
-					incr ready_cnt -1
 					# annotate scheduled node with t_sched
 					# and t_end
 					dict set node_dict t_sched $t
@@ -327,6 +329,9 @@ proc malc_brave {lambda} {
 							break
 						}
 					}
+				} else {
+					# count how many nodes are ready
+					incr ready_cnt
 				}
 			}
 		}
