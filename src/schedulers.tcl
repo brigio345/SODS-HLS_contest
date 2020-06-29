@@ -139,10 +139,21 @@ proc malc_brave {lambda} {
 			set fus_max_running_arr($fu) 0
 		}
 
-		# setup variables to force entering the while loop
-		set waiting_cnt 1
+		set waiting_cnt [dict size $nodes_dict]
 		set ready_cnt 0
+		# set all nodes without parents as READY
+		dict for {node node_dict} $nodes_dict {
+			if {[get_attribute $node n_parents] == 0} {
+				dict set node_dict status $READY
+				dict set nodes_dict $node $node_dict
+				incr ready_cnt
+				incr waiting_cnt -1
+			}
+		}
+
+		# setup variables to force entering the while loop
 		set sched_complete 1
+
 		# initialize time
 		set t 0
 
@@ -152,12 +163,8 @@ proc malc_brave {lambda} {
 			# update current time
 			incr t
 
-			# initialize counters (needed for controlling the main loop)
-			set waiting_cnt 0
-			set ready_cnt 0
-
-			# check what nodes has completed at time t
-			# and update fus_running_arr accordingly
+			# check what nodes have completed at time t and update
+			# fus_running_arr and nodes status accordingly
 			dict for {node node_dict} $nodes_dict {
 				if {[dict get $node_dict status] != $RUNNING} {
 					continue
@@ -168,34 +175,30 @@ proc malc_brave {lambda} {
 					dict set nodes_dict $node $node_dict
 					set complete_arr($node) 1
 					incr fus_running_arr([dict get $node_dict fu]) -1
-				}
-			}
 
-			# update ready list
-			dict for {node node_dict} $nodes_dict {
-				if {[dict get $node_dict status] != $WAITING} {
-					continue
-				}
+					# update ready list
+					foreach child [get_attribute $node children] {
+						set ready 1
+						# check if all parents have completed
+						foreach parent [get_attribute $child parents] {
+							if {$complete_arr($parent) == 0} {
+								set ready 0
+								break
+							}
+						}
 
-				set ready 1
-				# check if all parents are completed
-				foreach parent [get_attribute $node parents] {
-					if {$complete_arr($parent) == 0} {
-						set ready 0
-						break
+						if {$ready == 1} {
+							set child_dict [dict get $nodes_dict $child]
+							dict set child_dict status $READY
+							dict set nodes_dict $child $child_dict
+							incr ready_cnt
+							incr waiting_cnt -1
+						}
 					}
 				}
-
-				if {$ready == 1} {
-					dict set node_dict status $READY
-					dict set nodes_dict $node $node_dict
-				} else {
-					# update waiting count (ready nodes
-					# will be counted later)
-					incr waiting_cnt
-				}
 			}
 
+			# slow down loop
 			foreach node $slowable_lst {
 				set node_dict [dict get $nodes_dict $node]
 
@@ -275,6 +278,7 @@ proc malc_brave {lambda} {
 				}
 			}
 
+			# scheduling loop
 			dict for {node node_dict} $nodes_dict {
 				if {[dict get $node_dict status] != $READY} {
 					continue
@@ -290,6 +294,8 @@ proc malc_brave {lambda} {
 				# schedule node with no more positive slack or
 				# which do not require additional fu
 				if {$slack == 0 || $running < $alloc} {
+					incr ready_cnt -1
+
 					# annotate scheduled node with t_sched
 					# and t_end
 					dict set node_dict t_sched $t
@@ -329,9 +335,6 @@ proc malc_brave {lambda} {
 							break
 						}
 					}
-				} else {
-					# count how many nodes are ready
-					incr ready_cnt
 				}
 			}
 		}
