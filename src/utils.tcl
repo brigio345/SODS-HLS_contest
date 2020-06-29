@@ -44,32 +44,6 @@ proc get_reverse_sorted_nodes {nodes_dict} {
 	return $sorted_dict
 }
 
-# sort_nodes_by_t_alap:
-#	* argument(s):
-#		- nodes_dict: dictionary in which keys correspond to nodes and
-#			values correspond to information about the key node.
-#			N.B. t_alap of each node is required
-#	* return: 
-#		nodes_dict sorted by t_alap in descending order.
-proc sort_nodes_by_t_alap {nodes_dict} {
-	set nodes_t_alap_lst [list]
-	dict for {node node_dict} $nodes_dict {
-		set t_alap [dict get $node_dict t_alap]
-		lappend nodes_t_alap_lst [list $node $t_alap]
-	}
-
-	set nodes_t_alap_lst [lsort -index 1 -integer $nodes_t_alap_lst]
-
-	set nodes_sorted_dict [dict create]
-	foreach node_t_alap_pair $nodes_t_alap_lst {
-		set node [lindex $node_t_alap_pair 0]
-		set node_dict [dict get $nodes_dict $node]
-		dict set nodes_sorted_dict $node $node_dict
-	}
-
-	return $nodes_sorted_dict
-}
-
 # update_t_alap:
 #	* argument(s):
 #		- node: node whose t_alap may have to be updated
