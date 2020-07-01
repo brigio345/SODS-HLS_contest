@@ -7,9 +7,13 @@
 | Faggiano Riccardo | s267514 |
 | Galasso Luigi | s267302 |
 #### Abstract
-The developed algorithm is a modified Minimum Area Latency Constrained algorithm:
-whenever it is possible functional units are replaced with slower ones, in order
-to lower power consumption and lower area occupation.
+The developed algorithm is a modified Minimum Area Latency Constrained algorithm.
+
+The basic idea is:
+* start from a feasible binding (all nodes associated to functional units)
+* sort functional units by delay and filter out those which are slower and 
+requires more power or area
+* slow down every node as far as timing constraints are satisfied
 
 #### Control flow diagram
 ```plantuml
@@ -21,8 +25,9 @@ power and area
 :Associate each node
 to fastest fu;
 note left
-	Try to satisfy
+	This ensures that
 	timing constraints
+	are satisfied
 end note
 :Label each node with its t_ALAP;
 :Do not allocate any fu;
@@ -30,44 +35,65 @@ note left
 	Actually needed fus
 	will be allocated only
 end note
-:Sort nodes by t_ALAP;
-note left
-	Ensure to schedule most
-	critical nodes first
-end note
 	
 repeat
 	if (Not force restarted) then (true)
-		:Set all nodes not associated
-		with slowest fu as slowable;
+		:Allow every node to be
+		slowed down, if possible;
 	else (false)
 	endif
 	note left
-		Allow slow down only if
-		scheduling is actually (re)started
+		Allow at max one slow down per scheduling
+		iteration: this is to avoid slowing down
+		first nodes in topological order too much,
+		which may force later nodes to be associated
+		with fastest resources in order to satisfy
+		timing constraints
 	end note
 		:waiting = all nodes
 		ready = empty
-		running = empty;
+		running = empty
+		complete = empty;
 		:t = 0;
 	while (Not all nodes are scheduled \n and not force restarted) is (true)
 		:t++;
-		:ready = all waiting nodes with all parents scheduled
-		running = running - nodes completed at time t;
-		while (Foreach node in ready)
-			if (Slack > 0 AND slowable AND \ntiming is satisfied with immediately slower fu) then (true)
-				:Slow down to immediately
-				slower fu;
-				:Update t_ALAP and
-				update the sorting by t_ALAP;
-				:Set as not slowable;
-				note left
-					Slow down only
-					once per iteration
-				end note
+		while (Foreach node in running) is (true)
+			if (node t_end == t) then (true)
+				:running = running - node
+				complete = complete + node;
+				while (Foreach child of node) is (true)
+					if (all parents of child in complete) then (true)
+						:waiting = waiting - child
+						ready = ready + child;
+						if (child allowed to be slowed AND\nnot associated with slowest fu) then (true)
+							:slowable = slowable + child;
+						else (false)
+						endif
+					else (false)
+					endif
+				endwhile
 			else (false)
 			endif
 		endwhile
+		while (Foreach node in slowable)
+			:slowable = slowable - node;
+			note left
+				Slow down only once
+				per iteration at max
+			end note
+			if (\t\t\tSlack > 0 AND \ntiming is satisfied with immediately slower fu) then (true)
+				:Slow down to immediately
+				slower fu;
+				:Update t_ALAP of current node and
+				of all its ancestors recursively;
+			else (false)
+			endif
+		endwhile
+		:Sort ready nodes by t_ALAP;
+		note left
+			Ensure to schedule most
+			critical nodes first
+		end note
 		while (Foreach node in ready)
 			if (Slack == 0 OR do not require additional fu) then (true)
 				:Schedule node at time t and add it to running;
@@ -78,6 +104,7 @@ repeat
 						Make use of newly added fu
 						in previuos times too
 					end note
+					:break;
 				else (false)
 				endif
 			else (false)
