@@ -242,10 +242,6 @@ proc malc_brave {lambda} {
 						foreach parent [get_attribute $node parents] {
 							set nodes_dict [update_t_alap $parent $node $nodes_dict]
 						}
-
-						set sched_complete 0
-
-						break
 					}
 				}
 			}
