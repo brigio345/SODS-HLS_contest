@@ -40,11 +40,6 @@ proc alap_sched {nodes_dict lambda} {
 proc malc_brave {lambda} {
 	set nodes_dict [dict create]
 
-	array set fus_running_arr {}
-	array set fus_max_running_arr {}
-	array set slow_allowed_arr {}
-	set slowable_lst [list]
-
 	array set fus_arr [get_sorted_selected_fus_arr]
 	# associate nodes to fastest resources
 	foreach node [get_nodes] {
@@ -63,7 +58,6 @@ proc malc_brave {lambda} {
 	}
 
 	# do not allocate any fu at the beginnning
-	array set fus_alloc_arr {}
 	foreach fu [get_lib_fus] {
 		set fus_alloc_arr($fu) 0
 	}
@@ -94,17 +88,13 @@ proc malc_brave {lambda} {
 
 		# set all nodes as "waiting"
 		# set no node as "running" or "ready"
-		set waiting_lst [dict keys $nodes_dict]
 		set ready_lst [list]
-		set running_lst [list]
-		array set complete_arr {}
 		# set nodes with no parent as "ready" and "slowable" (if possible)
 		# set no node as "complete"
 		dict for {node node_dict} $nodes_dict {
 			set complete_arr($node) 0
 			if {[get_attribute $node n_parents] == 0} {
 				lappend ready_lst $node
-				lremove waiting_lst $node
 
 				if {$slow_allowed_arr($node) == 1} {
 					set slow_allowed_arr($node) 0
@@ -114,9 +104,11 @@ proc malc_brave {lambda} {
 					set fu_index [dict get $node_dict fu_index]
 
 					if {$fu_index < [llength $fus_arr($op)] - 1} {
-						lappend slowable_lst $node
+						set slowable_arr($node) 1
 					}
 				}
+			} else {
+				set waiting_arr($node) 1
 			}
 		}
 
@@ -134,17 +126,17 @@ proc malc_brave {lambda} {
 		set t 0
 
 		# iterate until all nodes are scheduled or restart is forces (sched_complete == 0)
-		while {[llength $waiting_lst] + [llength $ready_lst] > 0 && $sched_complete == 1} {
+		while {[array size waiting_arr] + [llength $ready_lst] > 0 && $sched_complete == 1} {
 			# update current time
 			incr t
 
 			# check what nodes have completed at time t and update
 			# fus_running_arr and nodes status accordingly
-			foreach node $running_lst {
+			foreach node [array names running_arr] {
 				set node_dict [dict get $nodes_dict $node]
 
 				if {$t >= [dict get $node_dict t_end]} {
-					lremove running_lst $node
+					unset running_arr($node)
 
 					set complete_arr($node) 1
 					incr fus_running_arr([dict get $node_dict fu]) -1
@@ -162,7 +154,7 @@ proc malc_brave {lambda} {
 
 						if {$ready == 1} {
 							lappend ready_lst $child
-							lremove waiting_lst $child
+							unset waiting_arr($child)
 
 							if {$slow_allowed_arr($child) == 1} {
 								set slow_allowed_arr($child) 0
@@ -173,7 +165,7 @@ proc malc_brave {lambda} {
 								set fu_index [dict get $child_dict fu_index]
 
 								if {$fu_index < [llength $fus_arr($op)] - 1} {
-									lappend slowable_lst $child
+									set slowable_arr($child) 1
 								}
 							}
 						}
@@ -182,7 +174,7 @@ proc malc_brave {lambda} {
 			}
 
 			# slow down loop
-			foreach node $slowable_lst {
+			foreach node [array names slowable_arr] {
 				set node_dict [dict get $nodes_dict $node]
 				set t_alap [dict get $node_dict t_alap]
 				set slack [expr {$t_alap - $t}]
@@ -236,7 +228,7 @@ proc malc_brave {lambda} {
 			#	- if a node hasn't been replaced, it is impossible
 			#		that it can be replaced in next iterations,
 			#		since the slack will decrease
-			set slowable_lst [list]
+			array unset slowable_arr
 
 			# sorting nodes by t_alap forces to schedule first most
 			# critical nodes, not only when their slack is 0, but
@@ -266,7 +258,7 @@ proc malc_brave {lambda} {
 				# schedule node with no more positive slack or
 				# which do not require additional fu
 				if {$slack == 0 || $running < $alloc} {
-					lappend running_lst $node
+					set running_arr($node) 1
 					lremove ready_lst $node
 
 					# annotate scheduled node with t_sched
