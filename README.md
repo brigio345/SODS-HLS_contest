@@ -76,11 +76,6 @@ repeat
 			endif
 		endwhile
 		while (Foreach node in slowable)
-			:slowable = slowable - node;
-			note left
-				Slow down only once
-				per iteration at max
-			end note
 			if (\t\t\tSlack > 0 AND \ntiming is satisfied with immediately slower fu) then (true)
 				:Slow down to immediately
 				slower fu;
@@ -89,6 +84,11 @@ repeat
 			else (false)
 			endif
 		endwhile
+		:slowable = empty;
+		note left
+			Slow down only once
+			per iteration at max
+		end note
 		:Sort ready nodes by t_ALAP;
 		note left
 			Ensure to schedule most
