@@ -86,11 +86,11 @@ proc malc_brave {lambda} {
 			set improvement 1
 		}
 
-		# set all nodes as "waiting"
-		# set no node as "running" or "ready"
-		set ready_lst [list]
+		# set no node as "running"
+		array unset running_arr
 		# set nodes with no parent as "ready" and "slowable" (if possible)
 		# set no node as "complete"
+		set ready_lst [list]
 		dict for {node node_dict} $nodes_dict {
 			set complete_arr($node) 0
 			if {[get_attribute $node n_parents] == 0} {
