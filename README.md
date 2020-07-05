@@ -7,13 +7,25 @@
 | Faggiano Riccardo | s267514 |
 | Galasso Luigi | s267302 |
 #### Abstract
-The developed algorithm is a modified Minimum Area Latency Constrained algorithm.
+`brave_opt` is a Tcl script compatible with Shy_HLS, aimed at minimizing power
+and area under latency constraints.
 
-The basic idea is:
-* start from a feasible binding (all nodes associated to functional units)
-* sort functional units by delay and filter out those which are slower and 
-requires more power or area
+The basic idea behind `brave_opt` is:
+* filter out non-convenient functional units
+* bind all nodes to fastest functional units (in order to check if the
+scheduling is feasible)
 * slow down every node as far as timing constraints are satisfied
+* schedule nodes using a Minimum Area Latency Constrained algorithm
+
+&nbsp;
+
+N.B. "non-convenient functional units" are:
+* slower and more power consuming
+* slower, equally power consuming and more or equal area requiring
+
+This filtering is hence prioritizing power saving: this choice has been taken
+considering that in modern designs power consumption is usually more critical
+than area occupation.
 
 #### Control flow diagram
 ```plantuml
@@ -50,8 +62,8 @@ repeat
 		with fastest resources in order to satisfy
 		timing constraints
 	end note
-		:waiting = all nodes
-		ready = empty
+		:ready = nodes without parents
+		waiting = all nodes - ready
 		running = empty
 		complete = empty;
 		:t = 0;
@@ -121,3 +133,4 @@ repeat while (Some node has been slowed down \n or force restarted) is (true)
 
 stop
 ```
+
