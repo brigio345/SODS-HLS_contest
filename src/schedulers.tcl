@@ -10,10 +10,11 @@ source ./contest/src/utils.tcl
 #		nodes_dict labeled with t_alap, which corresponds to the start time
 #			of the associated node, according to the ALAP algorithm.
 proc alap_sched {nodes_dict lambda} {
+	set t_alap_sink [expr {$lambda + 1}]
 	# iterate all nodes, in a reverse topological order
 	# (so that it is always considered a node with all descendant scheduled)
 	dict for {node node_dict} [get_reverse_sorted_nodes $nodes_dict] {
-		set t_alap_child_min $lambda
+		set t_alap_child_min $t_alap_sink
 		foreach child [get_attribute $node children] {
 			set t_alap_child [dict get [dict get $nodes_dict $child] t_alap]
 			if {$t_alap_child < $t_alap_child_min} {

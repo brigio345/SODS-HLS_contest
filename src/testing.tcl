@@ -124,6 +124,8 @@ proc test_occurrencies {node_start_lst node_fu_lst fu_alloc_lst} {
 #	* return: 
 #		1 if latency constraint is satisfied, 0 otherwise.
 proc test_latency {node_start_lst node_fu_lst lambda} {
+	set t_sched_sink [expr {$lambda + 1}]
+
 	foreach node [get_nodes] {
 		# check end time of leaves only
 		if {[get_attribute $node n_children] == 0} {
@@ -136,7 +138,7 @@ proc test_latency {node_start_lst node_fu_lst lambda} {
 
 			set end [expr {$start + $delay}]
 			
-			if {$end > $lambda} {
+			if {$end > $t_sched_sink} {
 				return 0
 			}
 		}
